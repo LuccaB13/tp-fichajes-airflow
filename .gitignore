@@ -17,3 +17,5 @@ airflow.db
 **/.astro/dbt_metadata.json
 **/.astro/manifest.slim.json
 include/bronze/
+include/silver/
+dataset_fichajes_silver.csv
