@@ -56,7 +56,7 @@ Contraseña: admin
 
 ---
 
-## 🛠️ 4. Capa Plata y Validación 
+## 4. Capa Plata y Validación 
 
 *   **Cortocircuito Inteligente:** Para evitar bloqueos y ahorrar recursos, el DAG verifica automáticamente si pasaron al menos 24 horas desde la última extracción. Si no hay novedad, salta el scraping pero fuerza la actualización de la Capa Plata con los datos locales.
 *   **Transformación (Capa Plata):** El script `transformacion_plata.py` (usando Pandas) lee todos los JSON dispersos de la carpeta `bronze/` y los consolida en una sola tabla. Suma métricas acumulativas (ej. goles, minutos), promedia estadísticas de rendimiento (ej. precisión de pases) y unifica los registros a **una fila por jugador y temporada de fichaje**.
