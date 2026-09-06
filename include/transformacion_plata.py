@@ -3,12 +3,13 @@ import json
 import pandas as pd
 import numpy as np
 
-# Rutas estándar (asumiendo ejecución dentro de Docker/Airflow)
+# Rutas estándar
 BRONZE_DIR = "/usr/local/airflow/include/bronze"
 SILVER_DIR = "/usr/local/airflow/include/silver"
 
+#Aca pasamos el precio de texto con el simboo de auros al lado a un número entero en euros
 def limpiar_coste(coste_str):
-    """Convierte '50,00 mill. €' a 50000000. Maneja casos de miles o formato libre."""
+    
     if not isinstance(coste_str, str): return np.nan
     coste = coste_str.lower().replace('€', '').strip()
     try:
@@ -23,8 +24,9 @@ def limpiar_coste(coste_str):
     except ValueError:
         return np.nan # Retorna nulo si no se puede parsear (ej. "Libre", "?")
 
+#Parecido a lo anterior, pero acá estamos sacando el "cm" de la altura y devolviendo el número entero en centímetros, si no es válido retorna Nan
 def limpiar_altura(altura_str):
-    """Extrae los centímetros como entero."""
+    
     if not isinstance(altura_str, str): return np.nan
     try:
         return int(altura_str.replace('cm', '').strip())
@@ -32,7 +34,8 @@ def limpiar_altura(altura_str):
         return np.nan
 
 def consolidar_plata():
-    """Lee todos los JSON de la capa bronce, consolida, limpia y guarda en capa plata."""
+    #Acá extraemos todos los JSON de la capa bronce, los aplanamos y los consolidamos en un CSV de la capa plata
+    #Al final va a quedar soo un csv con una fila por jugador/temporada, con todas las métricas sumadas y los datos biográficos limpios
     print("Iniciando consolidación de Capa Plata...")
     
     if not os.path.exists(BRONZE_DIR):
@@ -53,7 +56,7 @@ def consolidar_plata():
             with open(ruta_archivo, 'r', encoding='utf-8') as f:
                 datos_jugador = json.load(f)
                 
-                # Cada JSON puede tener múltiples registros (torneos)
+                # Cada JSON puede tener múltiples registros (torneos), por ejemplo si un jugador jugó la liga, una copa y la champions en la misma temporada
                 for torneo in datos_jugador:
                     registro = {
                         "jugador_id": torneo.get("jugador_id"),
@@ -103,15 +106,23 @@ def consolidar_plata():
 
     # 4. Agregación (Una fila por jugador/temporada)
     # Definimos qué hacer con cada tipo de columna al agrupar
-    # Las stats se suman, excepto los porcentajes o ratings que deberíamos promediar (pesados por minutos idealmente, pero promedio simple sirve por ahora)
+    # Las stats se suman, excepto los porcentajes o ratings que deberíamos promediar
+    # Lo de los promedios es medio compliocado, por eso primero identificamos qué columnas son stats y cuáles son promedios
+    
     
     columnas_bio = ['nombre', 'club_destino', 'club_origen', 'es_destino_top_20', 'coste_fichaje_eur', 'posicion', 'edad', 'altura_cm', 'pais', 'pie']
     
     # Separar stats acumulativas (sumar) vs promedios (mean)
     cols_stats = [c for c in df.columns if c.startswith('stat_')]
     cols_a_promediar = ['stat_rating', 'stat_pass_accuracy', 'stat_long_ball_accuracy', 'stat_cross_accuracy', 'stat_dribbles_success_rate', 'stat_duels_won_%', 'stat_aerials_won_%']
-    
-    dict_agregacion = {col: 'first' for col in columnas_bio} # Tomamos el primer valor para datos estáticos
+
+    # Separamos en mean y sum, mean es para las métricas que son porcentajes o ratings, sum es para las métricas acumulativas como goles, asistencias, etc.
+    # Y para el resto de datos, solo toammos el primer valor (ya que son datos biográficos que no cambian por torneo), esto es para evitar dator duplicados al agrupar por jugador_id y temporada
+    # Para qeu quede claro, este seria un ejemplo: supongamos que tomo tres promedios de gol, uno por el torneo, otro por la copa y otro por la champions, 
+    # al final quiero que me quede un promedio de gol por temporada, no por torneo, entonces hago un mean de esos tres valores. En cambio, si tomo los goles totales, quiero sumarlos para que me quede el total de goles en la temporada.
+    # Esto esta para repensarlo a futuro, porque si un jugador jugó mas en la liga que en una copa, y el promedio de gol de la liga es 0.5 y el de la copa es 1, el promedio final sería 0.75
+    # Esto es un problema porque no estoy ponderando por minutos jugados, entonces el promedio final no es representativo. Pero por ahora lo dejamos así, y en el futuro podemos mejorar esto.
+    dict_agregacion = {col: 'first' for col in columnas_bio} 
     
     for col in cols_stats:
         if col in cols_a_promediar:
@@ -122,7 +133,7 @@ def consolidar_plata():
     # Agrupamos por ID y Temporada
     df_consolidado = df.groupby(['jugador_id', 'temporada']).agg(dict_agregacion).reset_index()
 
-    # 5. Guardar la Capa Plata
+    # Guardar la Capa Plata, acá lo guardamos en una carpeta como la del bronze (es el csv)
     os.makedirs(SILVER_DIR, exist_ok=True)
     ruta_salida = os.path.join(SILVER_DIR, "dataset_fichajes_silver.csv")
     
@@ -132,6 +143,5 @@ def consolidar_plata():
     return ruta_salida
 
 if __name__ == "__main__":
-    # Para probar el script localmente antes de pasarlo a Airflow
-    # Cambia BRONZE_DIR a tu ruta local en Windows para probar
+
     consolidar_plata()

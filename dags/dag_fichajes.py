@@ -15,7 +15,8 @@ from include.extraccion_fotmob import obtener_catalogo_clubes, obtener_perfil_fo
 )
 def pipeline_fichajes():
 
-    # 1. EL SENSOR: Tantea que la API de FotMob esté viva antes de lanzar 384 tareas
+    # 1. EL SENSOR: la primera tarea del DAG es un sensor que espera a que la API de FotMob esté online antes de continuar. 
+    # Esto evita que el DAG falle si la API está caída temporalmente.
     @task.sensor(poke_interval=60, timeout=600, mode="reschedule", soft_fail=True)
     def esperar_api_fotmob() -> PokeReturnValue:
         import requests
@@ -36,7 +37,9 @@ def pipeline_fichajes():
             return PokeReturnValue(is_done=False)
 
 
-# 2. EL CORTOCIRCUITO: Verifica si ya se corrió recientemente
+# 2. EL CORTOCIRCUITO: Verifica si ya se corrió recientemente, el nombre me lo dio la IA, y quedó bien
+# funciona asi: si la variable de Airflow "ultima_extraccion_fichajes" tiene una fecha de hoy, corta el flujo y no hace nada.
+# Es muy util ya que pude probar la generación de la capa plata sin tener que esperar tanto para que se cumpla el schedule del DAG, y sin saturar la API de Transfermarkt con muchas peticiones.
     @task.short_circuit(ignore_downstream_trigger_rules=False)
     def hay_informacion_nueva() -> bool:
         from airflow.models import Variable
@@ -59,19 +62,21 @@ def pipeline_fichajes():
         print(f"Última extracción fue el {ultima_corrida_str}. Pasaron más de 24 hs.")
         print("Luz verde para buscar nuevos fichajes.")
         
-        # Importante: Solo deberíamos actualizar esta variable si la extracción es exitosa,
-        # pero para simplificar el ejemplo en esta tarea, lo actualizamos acá. 
-        # (En un entorno de producción estricto, esto se actualiza en la última tarea del DAG).
         Variable.set("ultima_extraccion_fichajes", hoy.strftime("%Y-%m-%d"))
         
         return True
 
     # 3. EXTRACCIÓN DEL CATÁLOGO
+    # Aca obtenemos el top de clubes de la UEFA desde Transfermarkt, hasta un máximo de 384 clubes, y devolvemos una lista con su nombre, slug, id y si es top 20 o no
+    # slug es el nombre del club en minúsculas y con guiones, por ejemplo "real-madrid", y lo necesitamos para armar la URL de Transfermarkt
     @task
     def extraer_catalogo_clubes():
         return obtener_catalogo_clubes(cantidad_maxima=384)
 
-    # 4. PROCESAMIENTO PARALELO (Dynamic Mapping)
+    # 4. PROCESAMIENTO PARALELO 
+    # el max_active_tis_per_dag=4 nos permite procesar 4 clubes en paralelo, para no saturar la API de Transfermarkt y FotMob
+    # map_index_template="{{ my_custom_map_index }}" nos permite mostrar en la UI de Airflow qué club se está procesando en cada tarea paralela
+    # yo lo probé con 4 a la vez, no probe mas por miedo a que me baneen la IP de Transfermarkt, pero se puede aumentar si se quiere
     @task(map_index_template="{{ my_custom_map_index }}", max_active_tis_per_dag=4)
     def procesar_club(club: dict):
         from airflow.sdk import get_current_context
@@ -82,7 +87,9 @@ def pipeline_fichajes():
         
         context = get_current_context()
         context["my_custom_map_index"] = f"Procesando: {club['nombre']}"
-        
+
+        # Esto es importante, definimos la temporada actual de Transfermarkt y cuántas temporadas hacia atrás queremos procesar
+        # Quizas a futuro deberimao poder hacerlo dinámico, pero por ahora lo dejamos hardcodeado
         temporada_actual_tm = 2026
         temporadas_hacia_atras = 3
         club_destino_actual = club['nombre']
@@ -126,7 +133,10 @@ def pipeline_fichajes():
                                     
                                     if os.path.exists(ruta_cache):
                                         continue 
-
+                                    # Aca llamamos a la función que obtiene el perfil del jugador desde FotMob, y le pasamos los datos que necesitamos para guardarlo en la capa bronce
+                                    # Como se guarda? Se guarda en un JSON con el nombre del jugador y la temporada, por ejemplo: bronce_lionel_messi_2023-2024.json
+                                    # Le pasamos estos datos porque la función necesita saber el nombre si o si el nombre y la temporada, lo otro son datos que van al JSON
+                                    # Ya que solo se pueden obtener desde Transfermarkt, y no desde FotMob, como el club de origen y el coste de la transferencia
                                     obtener_perfil_fotmob(nombre, coste, temporada_fotmob, club_destino_actual, club_origen, es_top_20)
                                     time.sleep(2) 
                         break 
@@ -145,7 +155,9 @@ def pipeline_fichajes():
         else:
             print("No se generó la Capa Plata.")
             return None
-        
+
+    # Estas son todas las validaciones que hacemos sobre la capa plata, si alguna falla, se dispara una alerta y el DAG queda en estado de error
+    # Son las que se piden en la entrega 1
     @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
     def validar_dataset_plata(ruta_csv: str):
         import pandas as pd
@@ -189,7 +201,10 @@ def pipeline_fichajes():
         return ruta_csv
 
     # --- DEFINICIÓN DEL GRAFO (DEPENDENCIAS) ---
-    
+    # Esta parte es la que define el flujo de tareas, es decir, qué tarea depende de cuál.
+    # La idea es que primero se espera a que la API de FotMob esté online, luego se verifica si ya se corrió hoy, 
+    # después se extrae el catálogo de clubes, luego se procesan los clubes en paralelo, 
+    # después se genera la capa plata y finalmente se valida el dataset resultante.
     # 1. Instanciamos las tareas
     espera = esperar_api_fotmob()
     novedad = hay_informacion_nueva()

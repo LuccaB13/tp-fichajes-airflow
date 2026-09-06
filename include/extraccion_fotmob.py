@@ -4,6 +4,7 @@ import json
 from bs4 import BeautifulSoup
 import time
 
+#los header nos sirven para que FotMob y Transfermarkt no nos bloqueen por ser un bot, les decimos que somos un navegador normal, y nos creen xd
 HEADERS_HTML = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Accept-Language": "es-ES,es;q=0.9"
@@ -69,7 +70,9 @@ def obtener_perfil_fotmob(nombre_jugador, coste, temporada_objetivo, club_destin
         
         anio_fichaje = int(temporada_objetivo.split('/')[0])
         
-        # BLINDAJE: or [] previene el error si playerInformation es null
+        # Aca extraemos la biografía del jugador, como edad, altura, país y pie preferido, el dato puede venir como un string 
+        # o como un objeto con un campo vacio, por eso hacemos la validación para obtener el valor limpio
+
         player_info = datos_perfil.get('playerInformation') or []
         for item in player_info:
             titulo = item.get('title', '')
@@ -90,7 +93,7 @@ def obtener_perfil_fotmob(nombre_jugador, coste, temporada_objetivo, club_destin
         temporadas_validas = [temporada_objetivo, anio_calendario]
         torneos_a_procesar = []
         
-        # BLINDAJE: Aseguramos que statSeasons no rompa el bucle
+        # Aca buscamos los torneos que tengan Deep Stats para las temporadas que nos interesan, y los guardamos en una lista para procesarlos después  
         stat_seasons = datos_perfil.get('statSeasons') or []
         for temporada in stat_seasons:
             if temporada.get('seasonName') in temporadas_validas:
@@ -102,7 +105,7 @@ def obtener_perfil_fotmob(nombre_jugador, coste, temporada_objetivo, club_destin
                             "entryId": torneo.get('entryId'),
                             "tournamentId": torneo.get('tournamentId')
                         })
-                
+        # Puede pasar que un jugador tenga Deep Stats en una temporada pero no en otra, por eso hacemos esta validación para ver si hay torneos a procesar        
         if not torneos_a_procesar:
             print(f"     [!] No hay Deep Stats para las temporadas {temporadas_validas}.")
             return
@@ -159,10 +162,11 @@ def obtener_perfil_fotmob(nombre_jugador, coste, temporada_objetivo, club_destin
             print(f"     [v] ¡Éxito! Archivo guardado en {ruta_archivo}")
 
     except Exception as e:
-        # PARACAÍDAS: Si cualquier cosa falla, lo ataja acá y el programa sigue con el próximo jugador.
+        # En FotMob, algunos jugadores no tienen stats o la API puede fallar, así que capturamos cualquier error inesperado
         print(f"     [X] Error inesperado al procesar a {nombre_jugador}: {e}")
 
-
+# Aca obtenemos el top de clubes de la UEFA desde Transfermarkt, hasta un máximo de 384 clubes, y devolvemos una lista con su nombre, slug, id y si es top 20 o no
+# En realidad 384 es el total de clubes que aparecen en la tabla de Transfermarkt, pero podemos limitarlo a menos si queremos
 def obtener_catalogo_clubes(cantidad_maxima=384):
     print(f"--- OBTENIENDO EL TOP {cantidad_maxima} DE CLUBES UEFA ---")
     clubes_base = []
