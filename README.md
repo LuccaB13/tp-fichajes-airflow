@@ -1,64 +1,116 @@
-# Pipeline de Datos - Fichajes y Estadísticas
+# Pipeline de fichajes — Ciencia de Datos, UTN FRM 2026
 
-Este repositorio contiene la arquitectura de extracción y orquestación de datos para nuestro proyecto integrador. El objetivo es construir un pipeline de datos escalable que alimente nuestro futuro modelo de análisis y sistema multi-agente.
+Construye un dataset donde **una fila es un fichaje**: un jugador que llegó a un
+club europeo en una temporada, con sus estadísticas de la temporada **anterior**
+al traspaso, y con los dos clubes —origen y destino— enriquecidos con el ranking
+oficial de UEFA.
 
-## 1. Arquitectura y Técnicas de Scraping
+La variable objetivo es `es_destino_top_20`: si el club que lo compró está entre
+los 20 primeros del coeficiente de clubes de UEFA de las últimas diez
+temporadas.
 
-El motor de extracción está construido en **Python** y orquestado mediante **Apache Airflow** (desplegado en contenedores Docker vía Astro CLI). 
+## Documentación
 
-Para recolectar la información, utilizamos una técnica híbrida de extracción orientada a dos fuentes principales:
+Todo está en un solo documento, en dos formatos:
 
-*   **Transfermarkt (HTML Parsing):** Utilizamos `BeautifulSoup` para navegar por el catálogo histórico. El script pagina dinámicamente hasta obtener los 384 clubes más importantes de la UEFA y luego viaja en el tiempo (3 temporadas hacia atrás) para extraer las transferencias (altas) de cada equipo, capturando el origen, destino y coste del fichaje.
-*   **FotMob (API Scraping):** Una vez que tenemos al jugador transferido, el sistema ataca los endpoints ocultos de la API de FotMob utilizando la librería `requests`. Realizamos un proceso de búsqueda (match por nombre) para obtener el `id` del jugador y luego descargamos sus *Deep Stats* (Minutos jugados, xG, pases, etc.) correspondientes a la temporada exacta previa a su traspaso.
+| Archivo | Para qué |
+|---|---|
+| [docs/Explicacion_Pipeline_Fichajes.pdf](docs/Explicacion_Pipeline_Fichajes.pdf) | **el documento para leer y compartir**: qué cambió, cómo funciona cada parte, el diagrama del DAG, el diccionario de columnas y la defensa oral |
+| [docs/EXPLICACION.md](docs/EXPLICACION.md) | la misma documentación en markdown. Es la **fuente**: se edita acá |
+| [docs/generar_pdf.py](docs/generar_pdf.py) | regenera el PDF a partir del markdown (`py docs/generar_pdf.py`) |
 
-**Optimizaciones clave:** 
-Implementamos un sistema de caché local y *Dynamic Task Mapping* en Airflow. El DAG clona ramas de ejecución en paralelo limitadas por *Pools* (máximo 4 a la vez) para procesar múltiples clubes simultáneamente sin sufrir bloqueos de IP o baneos por anti-bots.
+## Las tres fuentes
 
----
+| Fuente | Qué aporta | Acceso |
+|---|---|---|
+| **UEFA** | ranking y coeficiente de clubes (10 temporadas) y de asociaciones | API JSON pública, `comp.uefa.com` |
+| **Transfermarkt** | el fichaje: jugador, origen, destino, importe, edad, liga | HTML, dominio internacional |
+| **FotMob** | el rendimiento previo: 56 métricas por torneo | API interna, JSON |
 
-## 2. Descarga de la Capa Bronce (¡Importante!)
+## Las capas
 
-Dado que el orquestador extrae miles de archivos JSON en bruto, **NO ejecutaremos la extracción completa cada uno en su máquina** (tomaría horas y el repositorio de Git colapsaría de peso).
+```
+include/bronze/     el byte tal como vino, comprimido y particionado
+include/silver/     dataset_fichajes_silver.csv + dim_clubes.csv + dim_clubes_sin_cruce.csv
+include/output/     el entregable fechado de cada corrida
+include/frozen/     respaldo congelado, por si las fuentes no responden
+```
 
-Ya realicé la extracción de los 384 clubes y empaqueté los JSON. Para sincronizar tu entorno, sigue estos pasos:
+Ninguna se versiona: se regeneran corriendo el DAG.
 
-1. Descarga el archivo `.zip` con los datos desde este enlace de Google Drive:
-    [Descargar Capa Bronce - Google Drive](https://drive.google.com/drive/folders/11YaVodT0KpqIDaGyzrxGM3h4jG-Q03pY)
-2. Descomprime el archivo.
-3. Copia la carpeta llamada `bronze` y pégala **exactamente** dentro de la carpeta `include/` de este repositorio local.
-   *La ruta final debe quedar así: `tu_repo/include/bronze/bronce_jugador_año.json`*
+## Cómo levantarlo
 
-*(Nota: Esta carpeta ya está ignorada en el `.gitignore`, así que no te preocupes, no se subirá en tus futuros commits).*
+Hace falta **Docker Desktop** corriendo y **Astro CLI** instalado.
 
----
+```bash
+astro dev start
+```
 
-##  3. Montar el Entorno Local (Airflow + Docker)
+La primera vez tarda unos minutos. Después, `localhost:8080` — usuario `admin`,
+contraseña `admin`.
 
-Para poder ejecutar la orquestación o hacer pruebas con el código de extracción, necesitas tener el contenedor corriendo.
+### La primera corrida
 
-### Prerrequisitos:
-* Tener **Docker Desktop** instalado y abierto (con el motor corriendo).
-* Tener instalado **Astro CLI**.
+1. **Dejalo pausado** y disparalo a mano: *Trigger DAG w/ config* →
+   `modo = prueba`. Baja sólo el top 20 de UEFA y una temporada; termina en
+   minutos y sirve para ver el grafo moverse entero.
+2. Mirá la vista *Graph*: van a aparecer 20 instancias de la misma tarea, cada
+   una con el nombre de su club, corriendo de a cuatro. Eso es `.expand()` en
+   vivo.
+3. En modo prueba, `validar_dataset_plata` **va a fallar a propósito**: con 20
+   clubes el dataset no llega al mínimo de 1000 filas. No es un bug, es la
+   validación haciendo su trabajo — y por eso `publicar` no corre.
+4. **Disparalo de nuevo sin cambiar nada.** Esta vez termina en segundos y casi
+   todo queda en gris. No falló: `hay_novedad` se dio cuenta de que las fuentes
+   están igual y cortó. La corrida que no hace nada también es un resultado.
+5. Cuando quieras el dataset completo: `modo = normal`. Con los valores por
+   defecto (200 clubes, 3 temporadas) son unas 600 páginas de Transfermarkt y
+   varios miles de consultas a FotMob: **calculá un par de horas la primera
+   vez**. Las siguientes reusan el bronce.
 
-### Pasos para ejecutar:
-1. Abre una terminal (CMD, PowerShell o bash) en la raíz de este repositorio.
-2. Ejecuta el siguiente comando para construir e inicializar los contenedores:
-   ```bash
-   astro dev start
-3. Una vez que la terminal finalice de cargar los procesos, abre tu navegador web e ingresa a:
-http://localhost:8080
+> ⚠️ **Despausar el DAG dispara una corrida enseguida, con los parámetros por
+> defecto** — o sea los 200 clubes y las 3 temporadas, no lo que hayas elegido
+> en el formulario. Despausalo cuando estés listo para esa corrida larga, no
+> antes.
 
-4. Inicia sesión con las credenciales por defecto:
+> ⚠️ **La capa bronce vieja del Drive ya no sirve** y no se puede convertir: no
+> contiene el HTML de Transfermarkt, así que de ahí no salen ni la liga del club
+> de origen, ni el id del club, ni la edad real al fichaje. Hay que regenerarla.
+> Ver la sección 4 del documento de explicación.
 
-Usuario: admin
+### Parámetros de corrida
 
-Contraseña: admin
+| Parámetro | Por defecto | Qué hace |
+|---|---|---|
+| `modo` | `normal` | `prueba` pisa todo: top 20 y una temporada |
+| `tope_ranking_uefa` | `200` | hasta qué puesto del ranking UEFA se procesan clubes de destino |
+| `temporadas_hacia_atras` | `3` | cuántas temporadas de fichajes, desde la actual |
+| `anio_uefa` | `2027` | ventana del ranking de diez años. Fijarlo hace la corrida reproducible |
+| `forzar` | `false` | ignora la huella de frescura y vuelve a pedir todo |
 
----
+## Probar sin levantar Airflow
 
-## 4. Capa Plata y Validación 
+Para depurar el parseo sin esperar a los contenedores:
 
-*   **Cortocircuito Inteligente:** Para evitar bloqueos y ahorrar recursos, el DAG verifica automáticamente si pasaron al menos 24 horas desde la última extracción. Si no hay novedad, salta el scraping pero fuerza la actualización de la Capa Plata con los datos locales.
-*   **Transformación (Capa Plata):** El script `transformacion_plata.py` (usando Pandas) lee todos los JSON dispersos de la carpeta `bronze/` y los consolida en una sola tabla. Suma métricas acumulativas (ej. goles, minutos), promedia estadísticas de rendimiento (ej. precisión de pases) y unifica los registros a **una fila por jugador y temporada de fichaje**.
-*   **Variable Objetivo:** El resultado es el archivo `dataset_fichajes_silver.csv`.
-*   **Validación Automática:** La última tarea del orquestador actúa como auditor de calidad. Antes de dar el OK final, verifica programáticamente que el CSV tenga más de 1000 filas, que la clave primaria (`jugador_id` + `temporada`) sea única y que no existan columnas completamente vacías.
+```bash
+py -m include.fichajes.prueba_local --clubes 3 --temporadas 1
+```
+
+Agregá `--sin-fotmob` para saltear el paso lento.
+
+## El grafo
+
+```mermaid
+graph LR
+    A[esperar_fuentes] --> B{elegir_camino}
+    B -->|responden| C{hay_novedad}
+    B -->|30 min sin respuesta| R[usar_respaldo]
+    C -->|nada cambió| S([termina en verde])
+    C --> D[bronce UEFA] --> E[catálogo] --> F[bronce Transfermarkt] --> G[bronce FotMob] --> H[capa plata]
+    H --> V[validar]
+    R --> V
+    V --> P[publicar]
+```
+
+La versión completa del diagrama, con la regla de disparo de cada tarea, está en
+la sección 7 del documento de explicación.

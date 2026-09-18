@@ -1,2 +1,2 @@
-beautifulsoup4
-requests
+beautifulsoup4>=4.13
+pandas>=2.2

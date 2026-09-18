@@ -16,6 +16,17 @@ airflow.db
 
 **/.astro/dbt_metadata.json
 **/.astro/manifest.slim.json
+
+# Las capas de datos NO se versionan: se regeneran corriendo el DAG.
+#   bronze/  el crudo de las tres fuentes (pesa, y sale de la fuente)
+#   silver/  el dataset consolidado y la dimensión de clubes
+#   output/  el entregable fechado de cada corrida
 include/bronze/
 include/silver/
-dataset_fichajes_silver.csv
+include/output/
+
+# El respaldo tiene dos piezas y sólo una se versiona:
+#   fichajes_semilla.csv  viaja con el repositorio, garantiza que el respaldo
+#                         existe desde el primer clone. Se versiona.
+#   ultimo_ok.csv         lo reescribe cada corrida completa exitosa. No.
+include/frozen/ultimo_ok.csv
