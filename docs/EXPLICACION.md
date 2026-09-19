@@ -27,8 +27,9 @@ Ciencia de Datos · UTN FRM · 2026
 
 ## 1. Qué cambió en esta versión
 
-Diez cambios de fondo. Tres salieron de las correcciones del profesor; los
-otros siete aparecieron al revisar los datos y el código.
+Trece cambios de fondo. Tres salieron de las correcciones del profesor, siete
+aparecieron al revisar los datos y el código, y los tres últimos salieron de
+preparar la Entrega 2 sobre este mismo dataset.
 
 | # | Qué cambió | Antes | Ahora |
 |---|---|---|---|
@@ -42,9 +43,32 @@ otros siete aparecieron al revisar los datos y el código.
 | 8 | **Las métricas del resumen ya no se pierden** | si FotMob no mandaba el detalle, se descartaba también el resumen | se conserva lo que haya llegado (sección 12.3) |
 | 9 | **Menos columnas, y ninguna repetida** | seis columnas que repetían lo que ya decía otra | se sacaron; el linaje pasó de tres columnas a una (sección 11.4) |
 | 10 | **Una sola corrida a la vez** | dos corridas simultáneas consolidaban el bronce de la otra a medio escribir | `max_active_runs=1` (sección 9.3) |
+| 11 | **Cuatro temporadas en vez de tres** | `temporadas_hacia_atras=3` | `4`. Es la **única** palanca que agrega clase positiva: 825 positivos en vez de 611 (sección 6.12) |
+| 12 | **La plata no arma features** | se había puesto un puntaje de rendimiento normalizado por posición | se sacó: depende de qué filas entren al análisis, así que vive en el notebook (sección 4.6) |
+| 13 | **Un parámetro para restringir la población** | no existía | `exigir_estadisticas`, apagado por defecto (sección 6.12) |
 
 Además hubo seis correcciones de datos que aparecieron en el camino y están
 explicadas en la sección 12.2.
+
+> **Por qué cuatro temporadas y no más clubes**
+>
+> La pregunta obvia era subir el tope del ranking de destino para tener más
+> datos. No funciona, y conviene entender por qué: la columna objetivo es
+> `club_destino_ranking_uefa <= 20`, así que **sólo veinte clubes en el mundo
+> pueden producir un positivo**. Medido sobre el bronce, cada banda del ranking
+> aporta esto:
+>
+> | banda de ranking | clubes | filas | positivos |
+> |---|---|---|---|
+> | **1–20** | 20 | 825 | **825** |
+> | 21–50 | 28 | 1.564 | **0** |
+> | 51–100 | 49 | 2.480 | **0** |
+> | 101–150 | 45 | 2.725 | **0** |
+> | 151–200 | 46 | 2.758 | **0** |
+>
+> Ir de 200 a 400 clubes agregaría unas 11.000 filas y **ningún positivo**: la
+> tasa caería del 8,0% a ~4,7% y el desbalance empeoraría. Una temporada más, en
+> cambio, agrega filas de las dos clases en la misma proporción.
 
 > **Importante para el equipo**
 >
@@ -279,6 +303,25 @@ Dos archivos, y sólo uno se versiona:
 
 Sería el dataset ya listo para el modelo: features derivadas, agregados por
 liga. Se arma en las unidades 3 y 4 sobre esta misma plata.
+
+**Dónde termina la plata, exactamente.** La línea es fácil de cruzar sin darse
+cuenta, y la cruzamos una vez, así que conviene dejarla escrita.
+
+Un mapeo determinístico de una columna es **descripción** y va en la plata:
+`club_origen_liga_es_top5` sale del código de liga de esa misma fila y de nada
+más. Una columna cuyo valor depende de **cómo se agregan las demás filas** es una
+**feature** y no va en la plata.
+
+El caso concreto: se probó agregar un `score_posicion` —el rendimiento previo
+normalizado en z dentro del grupo de posición— y se sacó. El z se calcula contra
+la media y el desvío del grupo, así que su valor **cambia según qué filas entren
+al análisis**. Si el análisis después restringe la población, el score correcto es
+el de esa población, no el de las 10.352 filas. Congelarlo en la plata es decidir
+por adelantado una pregunta que le toca al análisis.
+
+Ese score vive ahora en el notebook de la Entrega 2
+(`Proyecto_entrega_2/entrega2_grupo_7.ipynb`), junto con la decisión de sobre qué
+población se normaliza.
 
 ---
 
@@ -689,9 +732,25 @@ la huella de la corrida en la Variable.
 |---|---|---|
 | `modo` | `normal` | `prueba` pisa todo: top 20 de UEFA y una temporada |
 | `tope_ranking_uefa` | `200` | hasta qué puesto del ranking UEFA se procesan clubes de destino |
-| `temporadas_hacia_atras` | `3` | cuántas temporadas de fichajes, desde la actual |
+| `temporadas_hacia_atras` | `4` | cuántas temporadas de fichajes, desde la actual |
 | `anio_uefa` | `2027` | ventana del ranking de diez años. Fijarlo hace la corrida reproducible |
 | `forzar` | `false` | ignora la huella de frescura y vuelve a pedir todo |
+| `exigir_estadisticas` | `false` | deja afuera a los jugadores sin temporada previa en FotMob |
+
+Los dos que conviene entender antes de tocarlos:
+
+**`temporadas_hacia_atras`** es la palanca que rinde. Subir el tope del ranking
+de clubes no puede agregar un solo positivo (la tabla de la sección 1 lo
+muestra); una temporada más agrega ~2.700 filas y ~210 positivos con el mismo
+balance de clases.
+
+**`exigir_estadisticas`** viene **apagado a propósito**. Prendido, el dataset
+pierde el 32,3% de las filas pero sólo el 25,3% de los positivos, y la clase
+positiva sube del 8,0% al 10,3%: es una restricción defendible. Pero la plata es
+la capa completa, y la partición de la población se declara **en el análisis**,
+donde se puede mostrar el contraste entre las dos poblaciones. Si el pipeline las
+borra, el gráfico que justifica la decisión no se puede dibujar. Existe para
+poder reproducir esa población desde el pipeline si alguna vez hace falta.
 
 ---
 
@@ -931,9 +990,14 @@ apretar el interruptor.
 defecto.** El DAG tiene `schedule="0 6 * * *"` y `catchup=False`. Al
 despausarlo, Airflow programa la corrida del intervalo más reciente, y esa
 corrida **no lleva la configuración que vos elegiste en el formulario**: va con
-los valores por defecto, o sea 200 clubes y 3 temporadas. Eso son varias horas
+los valores por defecto, o sea 200 clubes y 4 temporadas. Eso es más de una hora
 de scraping. Si lo único que querés es ver el grafo moverse, disparalo a mano
 con `modo = prueba` y dejá el DAG pausado.
+
+Y si disparaste una corrida a mano **antes** de despausar, la programada se te
+adelanta y la tuya queda encolada detrás por `max_active_runs=1`. No se pierde:
+se ejecuta después, y como para entonces la huella ya coincide, corta en
+`hay_novedad` y termina en verde sin bajar nada.
 
 **2. Dos corridas en paralelo se pisan.** Nos pasó exactamente eso: la corrida
 manual de prueba (20 clubes) y la programada (200 clubes) corrieron a la vez.
@@ -951,6 +1015,15 @@ compartido entre corridas**. Esa es justamente su gracia (por eso la segunda
 corrida no vuelve a pedir nada), pero significa que dos corridas simultáneas no
 son independientes.
 
+**3. Pausar el DAG congela la corrida que está en curso.** Esto sorprende, porque
+uno esperaría que pausar sólo impida que arranquen corridas nuevas. No es así: el
+scheduler **no programa tareas de un DAG pausado**, ni siquiera las de una corrida
+que ya empezó. Pausarlo con 188 tareas por delante las deja a todas en `scheduled`
+y no avanza ninguna.
+
+El orden correcto es: despausar, dejar que la corrida termine, y **recién
+entonces** pausar.
+
 ---
 
 ## 10. Validación de calidad de datos
@@ -960,7 +1033,7 @@ exitoso. Si cualquier chequeo falla, lanza un `ValueError`, el DAG queda en rojo
 y **`publicar` no corre**: el dato malo no llega a destino.
 
 Un criterio de calidad que no está escrito como código no protege nada. Los
-nueve chequeos cubren las cinco dimensiones canónicas:
+diez chequeos cubren las cinco dimensiones canónicas:
 
 | Dimensión | Chequeo |
 |---|---|
@@ -968,7 +1041,7 @@ nueve chequeos cubren las cinco dimensiones canónicas:
 | **Completitud** | ninguna columna del esquema falta; ninguna 100% vacía; las obligatorias sin un solo nulo. `coste_fichaje_eur` y `club_origen` **no** están entre las obligatorias: sus nulos son legítimos y están explicados en 12.3 |
 | **Volumen** | al menos 1000 filas y 30 columnas |
 | **Precisión** | edad entre 14 y 45; altura entre 140 y 220 cm; importes no negativos |
-| **Consistencia** | `es_destino_top_20` tiene que coincidir con `club_destino_ranking_uefa ≤ 20`; ningún club de destino puede quedar sin ranking; ninguna operación de las excluidas puede haberse colado |
+| **Consistencia** | `es_destino_top_20` tiene que coincidir con `club_destino_ranking_uefa ≤ 20`; ningún club de destino puede quedar sin ranking; ninguna operación de las excluidas puede haberse colado; `tiene_historial` tiene que coincidir con tener métricas `stat_*` |
 
 El chequeo de unicidad es el **test operativo de la unidad de análisis**: si la
 clave repite, o la unidad está mal definida o el pipeline duplica. Y tiene que
@@ -983,6 +1056,12 @@ club de destino no cruzara contra UEFA, su ranking quedaría nulo y
 `es_destino_top_20` saldría en `False` **por omisión**, no por el dato — la
 etiqueta quedaría mal sin que nada se queje.
 
+El cuarto es el que cuida el bloque de FotMob: si `tiene_historial` dijera `True`
+en una fila sin ninguna métrica, o al revés, o el flag miente o las `stat_*` se
+perdieron al consolidar. Es un chequeo que mira la **coherencia interna de la
+fila**, sin depender del resto del dataset — que es la única clase de chequeo que
+corresponde a esta capa.
+
 **La validación no exige cero nulos**, y la distinción importa: nulos parciales
 son esperables y explicables (sección 12.3); una columna entera en nulo indica
 que algo se rompió.
@@ -993,12 +1072,19 @@ que algo se rompió.
 
 ### 11.1 Una fila es un fichaje
 
-La entidad de estudio no es "el jugador" sino **el par jugador + temporada de
-fichaje**: un jugador transferido a un club en una temporada concreta, con sus
-estadísticas de la temporada **anterior** al traspaso.
+La entidad de estudio no es "el jugador" sino **el traspaso**: un jugador que
+llegó a un club en una temporada concreta, con sus estadísticas de la temporada
+**anterior** al traspaso.
 
 El mismo jugador aparece más de una vez si fue transferido más de una vez dentro
-de la ventana que recorre el DAG.
+de la ventana que recorre el DAG, y no es raro: sobre las 10.352 filas hay 8.260
+jugadores distintos — **1.618 aparecen más de una vez** y 386 aparecen tres veces
+o más.
+
+> **Esto importa para la Unidad 3.** Las filas **no son independientes**. Separar
+> entrenamiento y prueba al azar dejaría al mismo jugador de los dos lados, y el
+> modelo se evaluaría sobre gente que ya vio. La partición tiene que ser **por
+> jugador o por temporada**, no por fila.
 
 **La clave primaria es `operacion_id`**, el identificador que Transfermarkt le
 da a cada traspaso. Es la clave natural: si la unidad de análisis es el fichaje,
@@ -1071,23 +1157,36 @@ negocia *con* el club de destino en el mismo momento en que se decide el
 destino. Filtrar por "tiene precio" es condicionar la muestra sobre una variable
 que se determina junto con la variable objetivo.
 
+Hay algo más fuerte todavía, que se midió al preparar la Entrega 2: **el nulo del
+importe no es un dato faltante, es un nulo estructural**. `coste_fichaje_eur` está
+presente exactamente en las compras y las cesiones con cargo, y ausente
+exactamente en las cesiones, los libres y los desconocidos — **en 10.351 de las
+10.352 filas**. Un pase libre no tiene monto porque no hay monto. Filtrar por
+"tiene precio" no es limpiar datos: es filtrar por `tipo_operacion` con otro
+nombre.
+
 Y el efecto es medible, porque los fichajes sin importe no se reparten parejo:
 
 | | altas a clubes NO top 20 | altas a clubes TOP 20 |
 |---|---:|---:|
-| `compra` | 21,4% | 32,6% |
-| `libre` | **15,3%** | **3,5%** |
-| `desconocido` | 18,2% | 11,4% |
+| `compra` | 32,1% | 56,2% |
+| `libre` | **23,4%** | **7,9%** |
+| `desconocido` | 27,7% | 20,5% |
 
 Los clubes de afuera del top 20 fichan a coste cero tres veces más seguido. El
 filtro viejo borraba negativos de forma despareja e inflaba la clase positiva
-del 8,0% al 13,9%: el dataset decía que llegar a un club top es casi el doble de
+del 8,0% al 13,6%: el dataset decía que llegar a un club top es casi el doble de
 común de lo que es.
 
-| | filas | clase positiva |
-|---|---:|---:|
-| filtro viejo (sólo con importe) | 2.938 | 13,9% |
-| **ahora (todo menos `fin_de_cesion`)** | **7.645** | **8,0%** |
+| | filas | positivos | clase positiva |
+|---|---:|---:|---:|
+| filtro viejo (sólo con importe) | 3.913 | 532 | 13,6% |
+| **ahora (todo menos `fin_de_cesion`)** | **10.352** | **825** | **8,0%** |
+
+El filtro se lleva el 62,2% de las filas y **el 35,5% de los positivos**, deja la
+muestra en 90% compras y derrumba los filiales del 19,6% al 2,6%. Y los efectos
+que se quieren medir **empeoran**: la separación estandarizada del coeficiente
+UEFA del país de origen baja de 1,088 a 0,798, o sea de verde a amarillo.
 
 El importe se conserva como columna con nulos, y `tipo_operacion` dice si fue
 libre o si la cifra no se publicó. **Qué filas usar es una decisión del
@@ -1235,8 +1334,9 @@ columnas sin perder información.
 
 **Métricas** — `stat_*`
 
-Unas 56 columnas: `stat_goals`, `stat_minutes`, `stat_expected_goals_(xg)`,
-`stat_pass_accuracy`, `stat_rating`…
+**65 columnas** en la corrida actual: `stat_goals`, `stat_minutes`, `stat_xg`,
+`stat_pass_accuracy`, `stat_rating`… El total del dataset es **107 columnas: 42
+descriptivas + 65 métricas**.
 
 > **Las columnas `stat_*` no son una lista fija**
 >
@@ -1297,8 +1397,8 @@ Los nulos no son aleatorios — cada uno tiene un origen identificable:
 
 | Columna | Por qué puede ser nula |
 |---|---|
-| `coste_fichaje_eur` | el fichaje fue libre, o Transfermarkt no publicó la cifra. Son el 53,7%, y `tipo_operacion` dice cuál de los dos |
-| `club_origen` | el jugador llegó **sin contrato**. Szczesny a Barcelona en 2024/25 es el caso. 82 filas |
+| `coste_fichaje_eur` | **nulo estructural**: la operación no tuvo monto. Son el 62,2%, y coincide con `tipo_operacion ∈ {cesión, libre, desconocido}` en 10.351 de 10.352 filas |
+| `club_origen` | el jugador llegó **sin contrato**. Szczesny a Barcelona en 2024/25 es el caso. 216 filas |
 | `stat_*` | no son fijas: FotMob no reporta la misma métrica para todos los jugadores. No es que falló la extracción |
 | todas las `stat_*` de una fila | el jugador no se pudo cruzar, o no tiene métricas esa temporada. Lo dice `tiene_historial` |
 | `club_origen_ranking_uefa` | el club de origen no está entre los 554 del ranking —le pasa a todo club no europeo y a los europeos chicos— **o es un filial** (11.3). Es información, no un hueco |
@@ -1308,27 +1408,33 @@ Los nulos no son aleatorios — cada uno tiene un origen identificable:
 
 > **Los nulos de `stat_*` son informativos, no un defecto**
 >
-> Sobre la corrida completa —7.645 fichajes, 188 clubes hasta el puesto 200 del
-> ranking, 3 temporadas— el **31,6% no tiene estadísticas**. No es un fallo
+> Sobre la corrida completa —10.352 fichajes, 188 clubes hasta el puesto 200 del
+> ranking, 4 temporadas— el **32,3% no tiene estadísticas**. No es un fallo
 > aleatorio de FotMob: la falta se concentra en un perfil muy concreto de
 > jugador.
 >
 > | tasa de filas sin estadísticas | |
 > |---|---:|
-> | jugadores de 28 años o más | 14,2% |
-> | jugadores de 18 o menos | **70,2%** |
-> | que vienen de un club europeo del ranking | 17,9% |
-> | que vienen de un filial o juvenil | **68,0%** |
+> | jugadores de 28 años o más | 15,6% |
+> | jugadores de 18 o menos | **71,6%** |
+> | que vienen de un club europeo del ranking | 18,5% |
+> | que vienen de un filial o juvenil | **69,3%** |
 >
 > Son jugadores muy jóvenes, sobre todo canteranos, que todavía no habían
 > acumulado minutos profesionales. La ausencia *es* el dato: marca la vía
 > "promesa joven" de entrada a un club top.
 >
-> Descartarlas costaría caro: el dataset bajaría de 7.645 a 5.229 filas, la
-> edad mediana subiría de 23 a 24 años, y se perderían **82 de los 611 casos
-> positivos**. Además la clase positiva saltaría del 8,0% al 10,1%, porque los
-> clubes de abajo del ranking tienen más fichajes sin historial que los de
-> arriba. O sea que el filtro no sólo achica: sesga.
+> Descartarlas cuesta: el dataset baja de 10.352 a 7.005 filas, la edad mediana
+> sube de 23 a 24 años, y se pierden **115 de los 825 casos positivos**. La clase
+> positiva sube del 8,0% al 10,1%, porque los clubes de abajo del ranking tienen
+> más fichajes sin historial que los de arriba: el filtro no sólo achica, sesga.
+>
+> Dicho esto, es un sesgo **mucho más suave que el del precio**: se lleva el 32,3%
+> de las filas pero sólo el 13,9% de los positivos, mientras que el filtro de
+> precio se llevaba el 62,2% de las filas y el 35,5% de los positivos. Por eso el
+> análisis de la Entrega 2 sí restringe la población —declarándolo— y el parámetro
+> `exigir_estadisticas` existe en el DAG. Lo que no hace el pipeline es aplicarlo
+> por su cuenta.
 
 > **Un bug que tuvo esto tapado**
 >
@@ -1368,6 +1474,34 @@ hace cada vez que se corrige el parseo o se agrega una columna derivada.
 
 En la versión anterior sólo quedaba el JSON de FotMob, así que cualquier arreglo
 en el parseo del fichaje obligaba a scrapear Transfermarkt de nuevo.
+
+### 12.6 Qué columnas NO se le pueden dar a un modelo
+
+Esto no cambia el pipeline —la plata las conserva todas— pero es lo primero que
+hay que saber antes de usar el dataset, y es fácil equivocarse.
+
+El momento de predecir es **justo antes de que el fichaje ocurra**. Ahí se sabe
+quién es el jugador, de dónde viene y cómo le fue la temporada pasada. **No** se
+sabe a dónde va, ni cuánto se pagó, ni bajo qué figura: todo eso se define *en* el
+fichaje, que es el evento que se quiere predecir.
+
+Con ese criterio, **once columnas quedan afuera**:
+
+| Bloque | Columnas | Por qué |
+|---|---|---|
+| Destino | `club_destino`, `club_destino_id`, `club_destino_pais`, `club_destino_ranking_uefa`, `club_destino_coeficiente_uefa` | la columna objetivo **es** `club_destino_ranking_uefa <= 20` |
+| Par origen-destino | `traspaso_domestico`, `salto_ranking_uefa`, `sube_de_categoria` | las tres se calculan usando el club de destino. `salto_ranking_uefa` es literalmente `ranking_origen − ranking_destino` |
+| La operación | `coste_fichaje_eur`, `tipo_operacion` | se definen en el mismo acto que el destino |
+
+Son, justamente, las que mejor "predicen": `club_destino_coeficiente_uefa` da una
+separación estandarizada de 4,1 y `coste_fichaje_eur` de 1,0. Un modelo con
+cualquiera de las dos acertaría casi todo, **por el peor de los motivos**.
+
+> **Una trampa menos obvia.** Contar cuántas veces aparece un jugador en el
+> dataset separa muchísimo —5,5% de tasa con un fichaje, 9,7% con dos, **17,6%
+> con tres o más**— y es tentador usarlo como variable. No se puede: ese conteo
+> incluye traspasos **futuros**, que en el momento de predecir todavía no
+> ocurrieron. Sólo valdría contando los anteriores a la fila.
 
 ---
 

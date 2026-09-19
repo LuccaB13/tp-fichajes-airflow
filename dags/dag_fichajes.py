@@ -119,12 +119,22 @@ ULTIMO_OK = bronce.RESPALDO_DIR / "ultimo_ok.csv"
                          "y sólo agrega negativos."),
         ),
         "temporadas_hacia_atras": Param(
-            3, type="integer", minimum=1, maximum=10,
+            4, type="integer", minimum=1, maximum=10,
             title="Cuántas temporadas de fichajes",
             description=("Contando desde la temporada en curso hacia atrás. "
-                         "Subir esto rinde más que bajar el ranking: una "
-                         "temporada más son ~750 filas con el mismo balance "
-                         "de clases."),
+                         "Es la única palanca que agrega clase positiva: una "
+                         "temporada más son ~2.500 filas y ~204 positivos, con "
+                         "el mismo balance. Subir el tope del ranking, en "
+                         "cambio, no puede agregar ni un positivo."),
+        ),
+        "exigir_estadisticas": Param(
+            False, type="boolean",
+            title="Sólo fichajes con estadísticas previas",
+            description=("Deja afuera a los jugadores sin temporada senior en "
+                         "FotMob (-31,6% de filas, -13,4% de positivos). Viene "
+                         "apagado: la plata es la capa completa y la partición "
+                         "de la población se declara en el análisis, donde se "
+                         "puede mostrar el contraste."),
         ),
         "anio_uefa": Param(
             2027, type="integer", minimum=2020, maximum=2035,
@@ -464,7 +474,9 @@ def pipeline_fichajes():
         temporada_actual = tm.temporada_actual(datetime.now(timezone.utc))
         _, cuantas = _alcance(params)
         temporadas = list(range(temporada_actual, temporada_actual - cuantas, -1))
-        return plata.consolidar(temporadas=temporadas)
+        return plata.consolidar(
+            temporadas=temporadas,
+            exigir_estadisticas=bool(params["exigir_estadisticas"]))
 
     # ------------------------------------------------------------------ 9
     @task
@@ -581,6 +593,18 @@ def pipeline_fichajes():
             plata.TIPOS_EXCLUIDOS)
         if excluidos:
             problemas.append(f"quedaron operaciones que no son fichajes: {excluidos}")
+
+        # `tiene_historial` tiene que coincidir con tener métricas de verdad:
+        # si se separan, o el flag miente o las `stat_*` se perdieron al
+        # consolidar. Es el chequeo que sí corresponde acá, porque mira la
+        # coherencia interna de la fila y no depende del resto del dataset.
+        metricas = [c for c in df.columns if c.startswith("stat_")]
+        if metricas and "tiene_historial" in df.columns:
+            con_hist = df["tiene_historial"].astype("boolean").fillna(False)
+            incoherentes = int((con_hist != df[metricas].notna().any(axis=1)).sum())
+            if incoherentes:
+                problemas.append(f"{incoherentes} filas donde tiene_historial no "
+                                 f"coincide con tener métricas stat_*")
 
         if problemas:
             raise ValueError("Validación fallida:\n  - " + "\n  - ".join(problemas))

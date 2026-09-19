@@ -26,6 +26,23 @@ la segunda de Bélgica. Ahora cada fila lleva, del club de origen:
 Y del par origen-destino salen tres columnas más: si el traspaso fue dentro
 del mismo país, cuántas posiciones de ranking saltó el jugador, y si ese salto
 fue hacia arriba.
+
+Dónde termina la plata
+----------------------
+Esta capa describe el fichaje; no arma features. La diferencia importa y es
+fácil de cruzar sin darse cuenta.
+
+Un mapeo determinístico de una columna --`club_origen_liga_es_top5` sale del
+código de liga y nada más-- es descripción, y va acá. Una columna que depende
+de **cómo se agregan las demás filas** es una feature, y no va acá: un puntaje
+de rendimiento normalizado por posición, por ejemplo, se calcula contra la
+media y el desvío del grupo, así que su valor cambia según qué filas entren al
+análisis. Congelarlo en la plata es decidir por adelantado una pregunta que le
+toca al análisis.
+
+Se probó poner acá un `score_posicion` (z de minutos, partidos y rating dentro
+del grupo de posición) y se sacó por ese motivo. Vive en el notebook de
+análisis, junto con la decisión de sobre qué población se normaliza.
 """
 from __future__ import annotations
 
@@ -142,19 +159,30 @@ TIPOS_EXCLUIDOS = ("fin_de_cesion",)
 
 
 def consolidar(temporadas: list[int] | None = None,
-               excluir_tipos: tuple[str, ...] = TIPOS_EXCLUIDOS) -> str | None:
+               excluir_tipos: tuple[str, ...] = TIPOS_EXCLUIDOS,
+               exigir_estadisticas: bool = False) -> str | None:
     """Arma el dataset plata y devuelve la ruta del CSV, o None si no hay nada.
 
-    Entran **todos los fichajes**, tengan o no importe publicado. Filtrar por
-    "tiene precio" sería condicionar la muestra sobre una variable que se
-    determina junto con la variable objetivo, no antes: los clubes de afuera
-    del top 20 fichan a coste cero tres veces más seguido que los del top 20
-    (11,5% contra 3,5% de sus altas), así que ese filtro borra negativos de
-    forma despareja e infla la clase positiva del 12,7% al 16,6%.
+    Entran **todos los fichajes**, tengan o no importe publicado. Y el importe
+    nulo no es un faltante: `coste_fichaje_eur` está presente exactamente en
+    las compras y las cesiones con cargo, y ausente exactamente en las
+    cesiones, los libres y los desconocidos -- 7.644 de 7.645 filas. Un pase
+    libre no tiene monto porque no hay monto. Es un **nulo estructural**.
 
-    El importe se conserva como columna con nulos. Qué filas usar es una
-    decisión del análisis, no del pipeline: el trabajo del pipeline es no
-    perder datos.
+    Por eso filtrar por "tiene precio" no es limpiar datos, es filtrar por
+    tipo de operación con otro nombre, y sale caro: se lleva el 61,6% de las
+    filas y el 33,1% de los positivos, sube la clase positiva del 8,0% al
+    13,9% por pura selección, y deja la muestra en 90% compras con los
+    filiales derrumbados del 19,7% al 2,7%. Los efectos no mejoran: el
+    coeficiente UEFA del país de origen baja de d = 1,076 a 0,786, o sea de
+    verde a amarillo.
+
+    `exigir_estadisticas` sí es una restricción defendible --pierde el 31,6%
+    de las filas pero sólo el 13,4% de los positivos-- pero viene apagada a
+    propósito. La plata es la capa completa; el análisis parte la población
+    y lo declara, que es lo que permite mostrar el contraste. Qué filas usar
+    es una decisión del análisis, no del pipeline: el trabajo del pipeline es
+    no perder datos.
     """
     crudo_clubes, crudo_asoc, actualizado = _uefa_mas_reciente()
     filas_uefa = uefa.a_filas_clubes(crudo_clubes)
@@ -337,9 +365,17 @@ def consolidar(temporadas: list[int] | None = None,
     if antes != len(df):
         log.info("%s filas con la misma operación, deduplicadas", antes - len(df))
 
-    # Las filas sin estadísticas no aportan la mitad del análisis, pero se
-    # conservan: cuántas son y de dónde vienen es un dato de calidad, y
-    # borrarlas escondería un sesgo (FotMob cubre peor las ligas chicas).
+    # Las filas sin estadísticas no aportan la mitad del análisis, pero por
+    # defecto se conservan: cuántas son y de dónde vienen es un dato de
+    # calidad, y borrarlas escondería un sesgo (FotMob cubre peor las ligas
+    # chicas, y los juveniles no tienen temporada senior que medir).
+    if exigir_estadisticas:
+        antes = len(df)
+        df = df[df["tiene_historial"].astype("boolean").fillna(False)]
+        df = df.reset_index(drop=True)
+        log.info("exigir_estadisticas: %s -> %s filas (-%.1f%%)",
+                 antes, len(df), 100 * (1 - len(df) / max(antes, 1)))
+
     df = _ordenar_columnas(df)
     df = _tipar(df)
 

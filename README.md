@@ -64,12 +64,12 @@ contraseña `admin`.
    todo queda en gris. No falló: `hay_novedad` se dio cuenta de que las fuentes
    están igual y cortó. La corrida que no hace nada también es un resultado.
 5. Cuando quieras el dataset completo: `modo = normal`. Con los valores por
-   defecto (200 clubes, 3 temporadas) son unas 600 páginas de Transfermarkt y
+   defecto (200 clubes, 4 temporadas) son unas 800 páginas de Transfermarkt y
    varios miles de consultas a FotMob: **calculá un par de horas la primera
    vez**. Las siguientes reusan el bronce.
 
 > ⚠️ **Despausar el DAG dispara una corrida enseguida, con los parámetros por
-> defecto** — o sea los 200 clubes y las 3 temporadas, no lo que hayas elegido
+> defecto** — o sea los 200 clubes y las 4 temporadas, no lo que hayas elegido
 > en el formulario. Despausalo cuando estés listo para esa corrida larga, no
 > antes.
 
@@ -84,7 +84,8 @@ contraseña `admin`.
 |---|---|---|
 | `modo` | `normal` | `prueba` pisa todo: top 20 y una temporada |
 | `tope_ranking_uefa` | `200` | hasta qué puesto del ranking UEFA se procesan clubes de destino |
-| `temporadas_hacia_atras` | `3` | cuántas temporadas de fichajes, desde la actual |
+| `temporadas_hacia_atras` | `4` | cuántas temporadas de fichajes, desde la actual |
+| `exigir_estadisticas` | `false` | deja afuera a los fichajes sin estadísticas previas en FotMob |
 | `anio_uefa` | `2027` | ventana del ranking de diez años. Fijarlo hace la corrida reproducible |
 | `forzar` | `false` | ignora la huella de frescura y vuelve a pedir todo |
 
