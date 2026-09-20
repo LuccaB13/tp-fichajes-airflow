@@ -166,19 +166,19 @@ def consolidar(temporadas: list[int] | None = None,
     Entran **todos los fichajes**, tengan o no importe publicado. Y el importe
     nulo no es un faltante: `coste_fichaje_eur` está presente exactamente en
     las compras y las cesiones con cargo, y ausente exactamente en las
-    cesiones, los libres y los desconocidos -- 7.644 de 7.645 filas. Un pase
+    cesiones, los libres y los desconocidos -- 13.062 de 13.063 filas. Un pase
     libre no tiene monto porque no hay monto. Es un **nulo estructural**.
 
     Por eso filtrar por "tiene precio" no es limpiar datos, es filtrar por
-    tipo de operación con otro nombre, y sale caro: se lleva el 61,6% de las
-    filas y el 33,1% de los positivos, sube la clase positiva del 8,0% al
-    13,9% por pura selección, y deja la muestra en 90% compras con los
-    filiales derrumbados del 19,7% al 2,7%. Los efectos no mejoran: el
-    coeficiente UEFA del país de origen baja de d = 1,076 a 0,786, o sea de
+    tipo de operación con otro nombre, y sale caro: se lleva el 63,1% de las
+    filas y el 38,4% de los positivos, sube la clase positiva del 8,0% al
+    13,4% por pura selección, y deja la muestra en 90% compras con los
+    filiales derrumbados del 19,5% al 2,6%. Los efectos no mejoran: el
+    coeficiente UEFA del país de origen baja de d = 1,088 a 0,798, o sea de
     verde a amarillo.
 
-    `exigir_estadisticas` sí es una restricción defendible --pierde el 31,6%
-    de las filas pero sólo el 13,4% de los positivos-- pero viene apagada a
+    `exigir_estadisticas` sí es una restricción defendible --pierde el 33,0%
+    de las filas pero sólo el 14,7% de los positivos-- pero viene apagada a
     propósito. La plata es la capa completa; el análisis parte la población
     y lo declara, que es lo que permite mostrar el contraste. Qué filas usar
     es una decisión del análisis, no del pipeline: el trabajo del pipeline es

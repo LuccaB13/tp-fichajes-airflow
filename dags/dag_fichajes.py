@@ -119,13 +119,16 @@ ULTIMO_OK = bronce.RESPALDO_DIR / "ultimo_ok.csv"
                          "y sólo agrega negativos."),
         ),
         "temporadas_hacia_atras": Param(
-            4, type="integer", minimum=1, maximum=10,
+            5, type="integer", minimum=1, maximum=10,
             title="Cuántas temporadas de fichajes",
             description=("Contando desde la temporada en curso hacia atrás. "
                          "Es la única palanca que agrega clase positiva: una "
-                         "temporada más son ~2.500 filas y ~204 positivos, con "
+                         "temporada más son ~2.700 filas y ~210 positivos, con "
                          "el mismo balance. Subir el tope del ranking, en "
-                         "cambio, no puede agregar ni un positivo."),
+                         "cambio, no puede agregar ni un positivo. 5 es el "
+                         "corte elegido: la curva de aprendizaje del modelo "
+                         "todavía sube, y una sexta llegaría a las "
+                         "estadísticas de 2020/21, jugada a puertas cerradas."),
         ),
         "exigir_estadisticas": Param(
             False, type="boolean",
