@@ -1080,7 +1080,7 @@ llegó a un club en una temporada concreta, con sus estadísticas de la temporad
 
 El mismo jugador aparece más de una vez si fue transferido más de una vez dentro
 de la ventana que recorre el DAG, y no es raro: sobre las 13.063 filas hay 9.862
-jugadores distintos — **2.315 aparecen más de una vez**. Y 298 jugadores tienen
+jugadores distintos — **2.315 aparecen más de una vez**. Y 435 jugadores tienen
 fichajes de las **dos** clases: Gündoğan fue al Barcelona y al City (top 20) y
 después al Galatasaray (no). Si la unidad fuera el jugador, eso sería una
 contradicción; como es el fichaje, son tres preguntas distintas.
