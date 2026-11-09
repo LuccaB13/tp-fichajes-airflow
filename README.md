@@ -1,5 +1,9 @@
 # Pipeline de fichajes — Ciencia de Datos, UTN FRM 2026
 
+> **Proyecto integrador completo:** el pipeline (este README, más abajo), el análisis y el modelo
+> (`analisis/`) y la aplicación web (`app/`). La sección [La aplicación](#la-aplicación-entrega-4)
+> explica cómo se regenera todo desde los datos.
+
 Construye un dataset donde **una fila es un fichaje**: un jugador que llegó a un
 club europeo en una temporada, con sus estadísticas de la temporada **anterior**
 al traspaso, y con los dos clubes —origen y destino— enriquecidos con el ranking
@@ -115,3 +119,55 @@ graph LR
 
 La versión completa del diagrama, con la regla de disparo de cada tarea, está en
 la sección 7 del documento de explicación.
+
+## La aplicación (Entrega 4)
+
+Una aplicación de Streamlit que cuenta el proyecto entero y deja usar el modelo: la pregunta, los
+datos, lo que encontramos, el modelo, y después explorar los fichajes y probar el modelo con un caso
+nuevo.
+
+| Carpeta | Qué hay |
+|---|---|
+| `analisis/` | los notebooks de la Entrega 2 (análisis exploratorio, seis hipótesis) y de la Entrega 3 (modelado) |
+| `app/modelo.py` | el modelo de la Entrega 3, tal cual el notebook: población, columnas, `ZPorRol`, pipeline y partición |
+| `app/build_app.py` | entrena el modelo con la misma semilla y genera todo lo que usa la aplicación |
+| `app/app.py` | la aplicación de Streamlit (gráficos con Altair) |
+| `app/datos/` | lo que genera `build_app.py`: el modelo entrenado, los fichajes con su predicción y los números |
+
+### De los datos a la aplicación
+
+```bash
+# 1. el pipeline publica el dataset en include/output/fichajes_AAAA-MM-DD.csv (ver arriba)
+# 2. instalar lo que usa la aplicación
+py -m pip install -r app/requirements.txt
+# 3. entrenar el modelo y generar app/datos/ (toma la última salida del DAG; tarda ~1 minuto)
+py app/build_app.py
+# 4. abrir la aplicación en el navegador
+py -m streamlit run app/app.py
+```
+
+`build_app.py` también acepta otro archivo: `py app/build_app.py --datos ruta/al/dataset.csv`.
+
+**Si el pipeline actualiza los datos, se corre de nuevo el paso 3** y la aplicación pasa a mostrar los
+datos nuevos. Después se hace commit de `app/datos/` y Streamlit Community Cloud se actualiza solo con
+el push.
+
+### Lo que hace `build_app.py`
+
+1. Arma la población de análisis igual que el notebook (con estadísticas previas, sin promociones
+   internas, sin el cruce roto con FotMob) y la misma partición por jugador.
+2. Repite el barrido de la Entrega 3 (cuatro familias, 36 combinaciones, validación cruzada por
+   jugador) y verifica que el elegido siga siendo el random forest del notebook.
+3. Entrena el modelo final con todo el entrenamiento y lo mide una vez en el test.
+4. Le da a cada fichaje la probabilidad de un modelo que no lo vio: validación cruzada para los del
+   entrenamiento, el modelo final para los del test.
+5. Guarda en `app/datos/` el modelo, los fichajes con su predicción y los números de la aplicación.
+
+Lo que muestra la aplicación coincide con el notebook `analisis/entrega3_grupo_7.ipynb`: f1 macro
+0,667 en el test, precision 0,394, recall 0,414.
+
+### Los notebooks
+
+Para correr los notebooks de `analisis/`, copiar la salida del DAG a esa carpeta con el nombre
+`fichajes.csv` (no se versiona, igual que las capas de datos). `ranking_fifa.csv` viaja con el
+repositorio.

@@ -1,0 +1,120 @@
+rol,stat,min,mediana,max
+Arquero,stat_minutes,1.0,90.0,450.0
+Arquero,stat_matches,0.0,24.0,67.0
+Arquero,stat_assists,0.0,0.5,4.0
+Arquero,stat_chances_created,1.0,2.0,6.0
+Arquero,stat_goals,0.0,0.0,0.0
+Arquero,stat_goals_conceded_inv,-82.0,-32.0,-0.0
+Arquero,stat_goals_prevented,-17.94,0.0399999999999999,18.42
+Arquero,stat_high_claims,1.0,19.0,102.0
+Arquero,stat_pass_accuracy,43.7,69.525,100.0
+Arquero,stat_save_percentage,20.0,100.0,488.3
+Arquero,stat_saves,0.0,69.0,211.0
+Defensor central,stat_minutes,1.0,1966.0,6845.0
+Defensor central,stat_matches,1.0,26.0,85.0
+Defensor central,stat_aerials_won_%,16.7,60.7,100.0
+Defensor central,stat_assists,0.0,0.0,8.0
+Defensor central,stat_big_chances_created,1.0,1.0,18.0
+Defensor central,stat_chances_created,1.0,5.0,102.0
+Defensor central,stat_dribbles_success_rate,20.0,71.4,100.0
+Defensor central,stat_duels_won_%,26.7,58.697500000000005,100.0
+Defensor central,stat_goals,0.0,1.0,12.0
+Defensor central,stat_interceptions,1.0,28.0,94.0
+Defensor central,stat_pass_accuracy,48.5,85.3,96.225
+Defensor central,stat_possession_won_final_3rd,1.0,2.0,35.0
+Defensor central,stat_recoveries,1.0,102.0,578.0
+Defensor central,stat_shots_on_target,1.0,3.0,26.0
+Defensor central,stat_successful_crosses,1.0,2.0,111.0
+Defensor central,stat_tackles,1.0,32.0,180.0
+Defensor central,stat_touches_in_opposition_box,1.0,17.0,128.0
+Defensor central,stat_xg,0.01,0.92,6.89
+Lateral,stat_minutes,1.0,1915.0,5376.0
+Lateral,stat_matches,1.0,28.0,68.0
+Lateral,stat_aerials_won_%,12.5,51.1,100.0
+Lateral,stat_assists,0.0,2.0,17.0
+Lateral,stat_big_chances_created,1.0,4.0,28.0
+Lateral,stat_chances_created,1.0,19.0,140.0
+Lateral,stat_dribbles_success_rate,11.1,52.075,100.0
+Lateral,stat_duels_won_%,20.0,52.7,100.0
+Lateral,stat_goals,0.0,1.0,20.0
+Lateral,stat_interceptions,1.0,22.0,113.0
+Lateral,stat_pass_accuracy,44.4,79.875,100.0
+Lateral,stat_possession_won_final_3rd,1.0,6.0,41.0
+Lateral,stat_recoveries,1.0,100.0,386.0
+Lateral,stat_shots_on_target,1.0,4.5,56.0
+Lateral,stat_successful_crosses,1.0,13.0,157.0
+Lateral,stat_tackles,1.0,39.0,137.0
+Lateral,stat_touches_in_opposition_box,1.0,29.0,262.0
+Lateral,stat_xg,0.0,0.865,19.74
+Mediocampo defensivo,stat_minutes,1.0,2024.0,5034.0
+Mediocampo defensivo,stat_matches,1.0,30.0,70.0
+Mediocampo defensivo,stat_aerials_won_%,7.7,54.8,100.0
+Mediocampo defensivo,stat_assists,0.0,1.0,10.0
+Mediocampo defensivo,stat_big_chances_created,1.0,2.0,22.0
+Mediocampo defensivo,stat_chances_created,1.0,16.0,89.0
+Mediocampo defensivo,stat_dribbles_success_rate,12.5,61.95,100.0
+Mediocampo defensivo,stat_duels_won_%,25.0,52.6,100.0
+Mediocampo defensivo,stat_goals,0.0,1.0,16.0
+Mediocampo defensivo,stat_interceptions,1.0,25.0,91.0
+Mediocampo defensivo,stat_pass_accuracy,64.7,84.5,96.9
+Mediocampo defensivo,stat_possession_won_final_3rd,1.0,9.0,45.0
+Mediocampo defensivo,stat_recoveries,2.0,123.0,421.0
+Mediocampo defensivo,stat_shots_on_target,1.0,5.0,35.0
+Mediocampo defensivo,stat_successful_crosses,1.0,3.0,73.0
+Mediocampo defensivo,stat_tackles,1.0,44.5,191.0
+Mediocampo defensivo,stat_touches_in_opposition_box,1.0,19.0,135.0
+Mediocampo defensivo,stat_xg,0.01,1.1,10.83
+Mediocampo ofensivo,stat_minutes,1.0,1748.5,5526.0
+Mediocampo ofensivo,stat_matches,1.0,29.0,68.0
+Mediocampo ofensivo,stat_aerials_won_%,7.1,44.975,100.0
+Mediocampo ofensivo,stat_assists,0.0,2.0,25.0
+Mediocampo ofensivo,stat_big_chances_created,1.0,4.0,40.0
+Mediocampo ofensivo,stat_chances_created,1.0,23.0,208.0
+Mediocampo ofensivo,stat_dribbles_success_rate,15.8,53.8,100.0
+Mediocampo ofensivo,stat_duels_won_%,15.8,47.8,100.0
+Mediocampo ofensivo,stat_goals,0.0,2.0,28.0
+Mediocampo ofensivo,stat_interceptions,1.0,13.0,79.0
+Mediocampo ofensivo,stat_pass_accuracy,39.1,81.80000000000001,97.9
+Mediocampo ofensivo,stat_possession_won_final_3rd,1.0,11.0,61.0
+Mediocampo ofensivo,stat_recoveries,2.0,97.0,454.0
+Mediocampo ofensivo,stat_shots_on_target,1.0,10.0,65.0
+Mediocampo ofensivo,stat_successful_crosses,1.0,8.0,156.0
+Mediocampo ofensivo,stat_tackles,1.0,32.0,144.0
+Mediocampo ofensivo,stat_touches_in_opposition_box,1.0,42.0,377.0
+Mediocampo ofensivo,stat_xg,0.01,2.26,18.43
+Delantero centro,stat_minutes,1.0,1518.5,5205.0
+Delantero centro,stat_matches,1.0,29.5,82.0
+Delantero centro,stat_aerials_won_%,9.1,42.833333333333336,100.0
+Delantero centro,stat_assists,0.0,2.0,23.0
+Delantero centro,stat_big_chances_created,1.0,4.0,34.0
+Delantero centro,stat_chances_created,1.0,18.0,135.0
+Delantero centro,stat_dribbles_success_rate,10.0,47.275,100.0
+Delantero centro,stat_duels_won_%,14.3,42.15,66.7
+Delantero centro,stat_goals,0.0,6.0,59.0
+Delantero centro,stat_interceptions,1.0,4.0,58.0
+Delantero centro,stat_pass_accuracy,43.8,71.63333333333333,93.5
+Delantero centro,stat_possession_won_final_3rd,1.0,11.0,53.0
+Delantero centro,stat_recoveries,1.0,46.0,343.0
+Delantero centro,stat_shots_on_target,1.0,19.0,131.0
+Delantero centro,stat_successful_crosses,1.0,3.0,80.0
+Delantero centro,stat_tackles,1.0,12.0,83.0
+Delantero centro,stat_touches_in_opposition_box,1.0,87.0,532.0
+Delantero centro,stat_xg,0.01,6.44,50.0
+Delantero extremo,stat_minutes,1.0,1538.0,5623.0
+Delantero extremo,stat_matches,1.0,29.0,70.0
+Delantero extremo,stat_aerials_won_%,4.2,38.55,100.0
+Delantero extremo,stat_assists,0.0,2.0,30.0
+Delantero extremo,stat_big_chances_created,1.0,5.0,47.0
+Delantero extremo,stat_chances_created,1.0,25.0,176.0
+Delantero extremo,stat_dribbles_success_rate,7.7,48.21000000000001,100.0
+Delantero extremo,stat_duels_won_%,11.1,45.235,70.9
+Delantero extremo,stat_goals,0.0,3.0,56.0
+Delantero extremo,stat_interceptions,1.0,8.0,78.0
+Delantero extremo,stat_pass_accuracy,50.0,78.3,100.0
+Delantero extremo,stat_possession_won_final_3rd,1.0,11.0,54.0
+Delantero extremo,stat_recoveries,1.0,74.0,317.0
+Delantero extremo,stat_shots_on_target,1.0,14.0,123.0
+Delantero extremo,stat_successful_crosses,1.0,10.0,149.0
+Delantero extremo,stat_tackles,1.0,22.0,115.0
+Delantero extremo,stat_touches_in_opposition_box,1.0,73.0,401.0
+Delantero extremo,stat_xg,0.01,3.48,39.84

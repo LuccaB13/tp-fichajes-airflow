@@ -1,0 +1,465 @@
+{
+ "construido": "2026-11-09",
+ "datos": "fichajes_2026-09-20.csv",
+ "pasos": [
+  [
+   "todos los fichajes del pipeline",
+   13063
+  ],
+  [
+   "con estadísticas de la temporada anterior",
+   8747
+  ],
+  [
+   "sin promociones internas",
+   7437
+  ],
+  [
+   "sin el cruce roto con FotMob",
+   7410
+  ]
+ ],
+ "fuga": [
+  "club_destino",
+  "club_destino_id",
+  "club_destino_pais",
+  "club_destino_ranking_uefa",
+  "club_destino_coeficiente_uefa",
+  "traspaso_domestico",
+  "salto_ranking_uefa",
+  "sube_de_categoria",
+  "coste_fichaje_eur",
+  "tipo_operacion"
+ ],
+ "n_ana": 7410,
+ "n_jugadores": 5279,
+ "positivos": 761,
+ "tasa_top20": 0.10269905533063428,
+ "n_train": 5928,
+ "n_test": 1482,
+ "por_temporada": [
+  {
+   "temporada_fichaje": "2022/2023",
+   "fichajes": 1452,
+   "top20": 146
+  },
+  {
+   "temporada_fichaje": "2023/2024",
+   "fichajes": 1523,
+   "top20": 157
+  },
+  {
+   "temporada_fichaje": "2024/2025",
+   "fichajes": 1543,
+   "top20": 147
+  },
+  {
+   "temporada_fichaje": "2025/2026",
+   "fichajes": 1641,
+   "top20": 172
+  },
+  {
+   "temporada_fichaje": "2026/2027",
+   "fichajes": 1251,
+   "top20": 139
+  }
+ ],
+ "piso": {
+  "media": 0.4729261820619861,
+  "desvio": 0.00015307835061807595
+ },
+ "comparacion": [
+  {
+   "familia": "gradient boosting",
+   "params": {
+    "learning_rate": 0.03,
+    "max_iter": 100,
+    "max_leaf_nodes": 31
+   },
+   "umbral": 0.25,
+   "f1": 0.6878507897099412,
+   "desvio": 0.018579702759486758,
+   "precision": 0.42848144879377054,
+   "recall": 0.4582287195314711
+  },
+  {
+   "familia": "random forest",
+   "params": {
+    "max_depth": 10,
+    "max_features": 0.3,
+    "min_samples_leaf": 1
+   },
+   "umbral": 0.25,
+   "f1": 0.6866720872990802,
+   "desvio": 0.01141316086244251,
+   "precision": 0.40655366812569727,
+   "recall": 0.4909760613660872
+  },
+  {
+   "familia": "regresión logística",
+   "params": {
+    "C": 0.1
+   },
+   "umbral": 0.2,
+   "f1": 0.67272376191127,
+   "desvio": 0.006713543929533795,
+   "precision": 0.3600562930446213,
+   "recall": 0.5302687740330866
+  },
+  {
+   "familia": "árbol de decisión",
+   "params": {
+    "max_depth": 5,
+    "min_samples_leaf": 1
+   },
+   "umbral": 0.3,
+   "f1": 0.6555663463267525,
+   "desvio": 0.010129302844956601,
+   "precision": 0.39276850647530415,
+   "recall": 0.3711518147561912
+  }
+ ],
+ "n_combinaciones": 36,
+ "umbral": 0.25,
+ "params": {
+  "max_depth": 10,
+  "max_features": 0.3,
+  "min_samples_leaf": 1
+ },
+ "por_umbral": [
+  {
+   "umbral": 0.05,
+   "f1": 0.5028496442008027,
+   "desvio": 0.012623575161303984,
+   "precision": 0.18478916060554093,
+   "recall": 0.9031943145606771
+  },
+  {
+   "umbral": 0.1,
+   "f1": 0.6036342229540376,
+   "desvio": 0.007074464915243892,
+   "precision": 0.24839000601757935,
+   "recall": 0.7913106933535127
+  },
+  {
+   "umbral": 0.15,
+   "f1": 0.652939379197157,
+   "desvio": 0.004922005941640316,
+   "precision": 0.30527797759214814,
+   "recall": 0.6764582321341436
+  },
+  {
+   "umbral": 0.2,
+   "f1": 0.6756536732134028,
+   "desvio": 0.01148679720514495,
+   "precision": 0.35431051490639975,
+   "recall": 0.5779727778310164
+  },
+  {
+   "umbral": 0.25,
+   "f1": 0.6866720872990802,
+   "desvio": 0.01141316086244251,
+   "precision": 0.40655366812569727,
+   "recall": 0.4909760613660872
+  },
+  {
+   "umbral": 0.3,
+   "f1": 0.6743549069265509,
+   "desvio": 0.012992144227279723,
+   "precision": 0.4482017441227968,
+   "recall": 0.3793898418593995
+  },
+  {
+   "umbral": 0.35,
+   "f1": 0.6552130818323285,
+   "desvio": 0.008111767170873056,
+   "precision": 0.4877480468178483,
+   "recall": 0.2955914053111538
+  },
+  {
+   "umbral": 0.4,
+   "f1": 0.6358785988596792,
+   "desvio": 0.013458962359846694,
+   "precision": 0.5429410929033963,
+   "recall": 0.2331863948635422
+  },
+  {
+   "umbral": 0.45,
+   "f1": 0.6099629078292571,
+   "desvio": 0.015478015219185586,
+   "precision": 0.5872419536591175,
+   "recall": 0.1773518691696875
+  },
+  {
+   "umbral": 0.5,
+   "f1": 0.5829537195492325,
+   "desvio": 0.01963019776163963,
+   "precision": 0.6426984126984128,
+   "recall": 0.1313947148413362
+  },
+  {
+   "umbral": 0.55,
+   "f1": 0.5543001755864496,
+   "desvio": 0.02332577431107284,
+   "precision": 0.7245698805838124,
+   "recall": 0.09034226529773766
+  },
+  {
+   "umbral": 0.6,
+   "f1": 0.5407278709161072,
+   "desvio": 0.020499593413101293,
+   "precision": 0.8563519813519814,
+   "recall": 0.07225484461862638
+  },
+  {
+   "umbral": 0.65,
+   "f1": 0.5279773006978348,
+   "desvio": 0.016939522753440406,
+   "precision": 0.8805555555555555,
+   "recall": 0.05744633276166118
+  },
+  {
+   "umbral": 0.7,
+   "f1": 0.516162909343108,
+   "desvio": 0.01619836644688711,
+   "precision": 0.96,
+   "recall": 0.0443309177706328
+  },
+  {
+   "umbral": 0.75,
+   "f1": 0.5069507465104286,
+   "desvio": 0.009255136281568724,
+   "precision": 0.96,
+   "recall": 0.03446775559748553
+  }
+ ],
+ "test": {
+  "f1": 0.6668552036199096,
+  "precision": 0.39375,
+  "recall": 0.4144736842105263,
+  "accuracy": 0.8744939271255061,
+  "accuracy_siempre_no": 0.8974358974358975,
+  "vp": 63,
+  "fp": 97,
+  "fn": 89,
+  "vn": 1233
+ },
+ "fp_destino": {
+  "puesto 21 a 50": 0.35051546391752575,
+  "puesto 51 a 100": 0.422680412371134,
+  "puesto 101 o más": 0.2268041237113402
+ },
+ "vn_destino": {
+  "puesto 21 a 50": 0.20113544201135442,
+  "puesto 51 a 100": 0.2773722627737226,
+  "puesto 101 o más": 0.5214922952149229
+ },
+ "clubes_test": [
+  {
+   "club": "FC Porto",
+   "encontrados": 3,
+   "perdidos": 13
+  },
+  {
+   "club": "Juventus FC",
+   "encontrados": 5,
+   "perdidos": 9
+  },
+  {
+   "club": "AS Roma",
+   "encontrados": 1,
+   "perdidos": 12
+  },
+  {
+   "club": "Chelsea FC",
+   "encontrados": 3,
+   "perdidos": 9
+  },
+  {
+   "club": "Atalanta BC",
+   "encontrados": 3,
+   "perdidos": 8
+  },
+  {
+   "club": "Atlético de Madrid",
+   "encontrados": 7,
+   "perdidos": 3
+  },
+  {
+   "club": "SL Benfica",
+   "encontrados": 2,
+   "perdidos": 8
+  },
+  {
+   "club": "Tottenham Hotspur",
+   "encontrados": 4,
+   "perdidos": 4
+  },
+  {
+   "club": "Bayer 04 Leverkusen",
+   "encontrados": 3,
+   "perdidos": 5
+  },
+  {
+   "club": "Manchester United",
+   "encontrados": 5,
+   "perdidos": 2
+  },
+  {
+   "club": "Manchester City",
+   "encontrados": 3,
+   "perdidos": 4
+  },
+  {
+   "club": "Real Madrid",
+   "encontrados": 6,
+   "perdidos": 0
+  },
+  {
+   "club": "Paris Saint-Germain",
+   "encontrados": 3,
+   "perdidos": 3
+  },
+  {
+   "club": "RB Leipzig",
+   "encontrados": 3,
+   "perdidos": 2
+  },
+  {
+   "club": "Inter Milan",
+   "encontrados": 2,
+   "perdidos": 3
+  },
+  {
+   "club": "Borussia Dortmund",
+   "encontrados": 2,
+   "perdidos": 2
+  },
+  {
+   "club": "Arsenal FC",
+   "encontrados": 2,
+   "perdidos": 1
+  },
+  {
+   "club": "FC Barcelona",
+   "encontrados": 3,
+   "perdidos": 0
+  },
+  {
+   "club": "Bayern Munich",
+   "encontrados": 1,
+   "perdidos": 1
+  },
+  {
+   "club": "Liverpool FC",
+   "encontrados": 2,
+   "perdidos": 0
+  }
+ ],
+ "importancia": [
+  {
+   "columna": "grupo_posicion",
+   "caida": 0.029111003911738754
+  },
+  {
+   "columna": "club_origen_coeficiente_uefa",
+   "caida": 0.027940581969154853
+  },
+  {
+   "columna": "club_origen_liga_es_top5",
+   "caida": 0.01704869443353123
+  },
+  {
+   "columna": "edad_al_fichaje",
+   "caida": 0.011849694338772565
+  },
+  {
+   "columna": "stat_pass_accuracy",
+   "caida": 0.01127362195385575
+  },
+  {
+   "columna": "stat_touches_in_opposition_box",
+   "caida": 0.009627192505381577
+  },
+  {
+   "columna": "stat_xg",
+   "caida": 0.009493834047855143
+  },
+  {
+   "columna": "stat_interceptions",
+   "caida": 0.0051308401798358496
+  },
+  {
+   "columna": "stat_minutes",
+   "caida": 0.0048560967770537086
+  },
+  {
+   "columna": "stat_possession_won_final_3rd",
+   "caida": 0.004109117038824961
+  },
+  {
+   "columna": "stat_shots_on_target",
+   "caida": 0.003971268330850142
+  },
+  {
+   "columna": "stat_matches",
+   "caida": 0.0037560228522467098
+  }
+ ],
+ "h5": [
+  {
+   "origen": "bajo",
+   "rendimiento": "bajo",
+   "tasa": 0.030110935023771792,
+   "n": 631
+  },
+  {
+   "origen": "bajo",
+   "rendimiento": "medio",
+   "tasa": 0.04572564612326044,
+   "n": 503
+  },
+  {
+   "origen": "bajo",
+   "rendimiento": "alto",
+   "tasa": 0.087248322147651,
+   "n": 447
+  },
+  {
+   "origen": "medio",
+   "rendimiento": "bajo",
+   "tasa": 0.0319634703196347,
+   "n": 438
+  },
+  {
+   "origen": "medio",
+   "rendimiento": "medio",
+   "tasa": 0.08533916849015317,
+   "n": 457
+  },
+  {
+   "origen": "medio",
+   "rendimiento": "alto",
+   "tasa": 0.20918367346938777,
+   "n": 588
+  },
+  {
+   "origen": "alto",
+   "rendimiento": "bajo",
+   "tasa": 0.061381074168797956,
+   "n": 391
+  },
+  {
+   "origen": "alto",
+   "rendimiento": "medio",
+   "tasa": 0.18126272912423624,
+   "n": 491
+  },
+  {
+   "origen": "alto",
+   "rendimiento": "alto",
+   "tasa": 0.3659305993690852,
+   "n": 634
+  }
+ ]
+}
