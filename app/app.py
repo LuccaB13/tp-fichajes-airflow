@@ -127,7 +127,7 @@ c2.markdown(f'<div class="cifra">{uno_de_cada(liga["liga top 5"])}</div>'
             'si el jugador viene de una liga top 5 (Premier, LaLiga, Serie A, Bundesliga o Ligue 1). '
             f'Desde las demás ligas, {uno_de_cada(liga["otra liga"])}.', unsafe_allow_html=True)
 c3.markdown(f'<div class="cifra">{uno_de_cada(tasa_mejores).capitalize()}</div>'
-            'si viene de un club fuerte de Europa y además fue de los que mejor rindieron para su puesto.',
+            'si viene de un club fuerte de Europa y tuvo una temporada de alto rendimiento: entre el tercio de mejores de su puesto, comparado con todos los fichajes del mismo puesto.',
             unsafe_allow_html=True)
 st.caption(f"Medido sobre {miles(resumen['n_ana'])} fichajes de {miles(resumen['n_jugadores'])} jugadores, cinco "
            f"temporadas (2022/23 a 2026/27). Un random forest que predice el destino con estos datos (f1 macro "
