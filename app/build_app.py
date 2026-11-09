@@ -88,16 +88,6 @@ def por_umbral(modelo, X, y, grupos, cv):
     return pd.DataFrame(filas).set_index("umbral"), proba
 
 
-def score_posicion(ana):
-    """El score de la Entrega 2: promedio de las z de las 7 stats propias del rol, dentro del rol."""
-    score = pd.Series(np.nan, index=ana.index)
-    for rol, propias in m.ESPECIFICAS.items():
-        filas = ana["grupo_posicion"].eq(rol)
-        v = ana.loc[filas, m.BASE + propias].apply(pd.to_numeric, errors="coerce")
-        score[filas] = ((v - v.mean()) / v.std()).mean(axis=1)
-    return score
-
-
 def main():
     t0 = time.time()
     parser = argparse.ArgumentParser()
@@ -172,10 +162,13 @@ def main():
     pi = permutation_importance(final, X_test, y_test, n_repeats=10, scoring=f1_con_umbral,
                                 random_state=m.SEMILLA, n_jobs=-1)
     importancia = pd.Series(pi.importances_mean, index=m.COLUMNAS_MODELO).sort_values(ascending=False)
+    por_bloque = m.importancia_por_bloque(final, X_test, y_test)
     print(f"  modelo final e importancia: listo ({time.time() - t0:.0f}s)")
 
     # lo que encontramos: club de origen × rendimiento (Hipótesis 5)
-    ana["score_posicion"] = score_posicion(ana)
+    ana["score_posicion"] = m.score_posicion(ana)
+    nv = m.niveles(ana)
+    ana[list(nv.columns)] = nv
     log_coef = np.log1p(ana["club_origen_coeficiente_uefa"])
     nivel_origen = pd.qcut(log_coef, 3, labels=["bajo", "medio", "alto"])
     nivel_score = pd.qcut(ana["score_posicion"], 3, labels=["bajo", "medio", "alto"])
@@ -191,7 +184,7 @@ def main():
     columnas_app = ["nombre", "temporada_fichaje", "grupo_posicion", "edad_al_fichaje", "club_origen",
                     "club_origen_liga", "club_origen_liga_es_top5", "club_origen_coeficiente_uefa",
                     "stat_minutes", "stat_matches", "club_destino", "club_destino_ranking_uefa",
-                    "es_destino_top_20", "conjunto", "proba", "resultado", "score_posicion"]
+                    "es_destino_top_20", "conjunto", "proba", "resultado", "score_posicion"] + list(nv.columns)
     ana[columnas_app].to_csv(os.path.join(salida, "fichajes_app.csv"), index=False)
 
     # columnas del modelo de cada fichaje, para «partir de un jugador real»
@@ -248,6 +241,8 @@ def main():
         "vn_destino": {k: float(v) for k, v in puesto(vn).items()},
         "clubes_test": clubes_test.reset_index(names="club").to_dict(orient="records"),
         "importancia": [{"columna": k, "caida": float(v)} for k, v in importancia.head(12).items()],
+        "bloques": [{"factor": k, "caida": float(r["caída del f1"]), "desvio": float(r["desvío"])}
+                    for k, r in por_bloque.iterrows()],
         "h5": h5.astype({"origen": str, "rendimiento": str}).to_dict(orient="records"),
     }
     with open(os.path.join(salida, "resumen.json"), "w", encoding="utf-8") as f:

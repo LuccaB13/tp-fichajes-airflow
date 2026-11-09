@@ -406,6 +406,33 @@
    "caida": 0.0037560228522467098
   }
  ],
+ "bloques": [
+  {
+   "factor": "rendimiento (las 23 stats)",
+   "caida": 0.11417522478807393,
+   "desvio": 0.010457514169005918
+  },
+  {
+   "factor": "club de origen (coeficientes, liga top 5, filial, europeo)",
+   "caida": 0.07381134788824772,
+   "desvio": 0.010674961735187843
+  },
+  {
+   "factor": "puesto",
+   "caida": 0.023722667384413587,
+   "desvio": 0.009705939178194706
+  },
+  {
+   "factor": "edad",
+   "caida": 0.014864088189757286,
+   "desvio": 0.005046305931053333
+  },
+  {
+   "factor": "temporada",
+   "caida": -0.0035640979097925516,
+   "desvio": 0.0019796650507742674
+  }
+ ],
  "h5": [
   {
    "origen": "bajo",

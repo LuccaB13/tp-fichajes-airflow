@@ -143,3 +143,67 @@ def particion(ana):
     idx_train, idx_test = next(corte.split(ana, y, groups=jugador))
     cv = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=SEMILLA)
     return idx_train, idx_test, y, jugador, cv
+
+
+# --------------------------------------------------------------------------- los factores (Sección 9)
+# Igual que el notebook: para leer el modelo por factor. Nada de esto entra al modelo.
+BLOQUES = {
+    "rendimiento (las 23 stats)": STATS,
+    "club de origen (coeficientes, liga top 5, filial, europeo)": ORIGEN_LOG + SI_NO,
+    "puesto": ["grupo_posicion"],
+    "edad": EDAD,
+    "temporada": ["temporada_fichaje"],
+}
+ORDEN_NIVELES = {"rendimiento comparado con su puesto": ["bajo", "medio", "alto"],
+                 "nivel UEFA del club de origen": ["fuera del ranking", "bajo", "medio", "alto"],
+                 "liga de origen": ["otra liga", "liga top 5"],
+                 "edad al fichar": ["≤19", "20-23", "24-27", "28+"],
+                 "puesto": ROLES}
+
+
+def f1_con_umbral(modelo, X, y, umbral=UMBRAL):
+    from sklearn.metrics import f1_score
+    return f1_score(y, modelo.predict_proba(X)[:, 1] >= umbral, average="macro")
+
+
+def importancia_por_bloque(modelo, X, y, bloques=BLOQUES, repeticiones=10, semilla=SEMILLA):
+    '''Cuánto cae el f1 macro al desordenar juntas todas las columnas de cada bloque.'''
+    X = X.reset_index(drop=True)
+    base = f1_con_umbral(modelo, X, y)
+    rng = np.random.default_rng(semilla)
+    filas = []
+    for nombre, cols in bloques.items():
+        caidas = []
+        for _ in range(repeticiones):
+            orden = rng.permutation(len(X))
+            Xp = X.copy()
+            for c in cols:                      # columna por columna, para no perder el tipo de cada una
+                Xp[c] = X[c].to_numpy()[orden]
+            caidas.append(base - f1_con_umbral(modelo, Xp, y))
+        filas.append({"factor": nombre, "caída del f1": np.mean(caidas), "desvío": np.std(caidas)})
+    return pd.DataFrame(filas).set_index("factor").sort_values("caída del f1", ascending=False)
+
+
+def score_posicion(datos):
+    '''El puntaje de la Entrega 2: promedio de las z de las 7 stats propias del puesto, dentro del puesto.'''
+    score = pd.Series(np.nan, index=datos.index)
+    for rol, propias in ESPECIFICAS.items():
+        filas = datos["grupo_posicion"].eq(rol)
+        v = datos.loc[filas, BASE + propias].apply(pd.to_numeric, errors="coerce")
+        score[filas] = ((v - v.mean()) / v.std()).mean(axis=1)
+    return score
+
+
+def niveles(datos):
+    '''El nivel de cada fichaje en cada factor (para leer el modelo; no entra al modelo).'''
+    coef = np.log1p(datos["club_origen_coeficiente_uefa"])
+    club = pd.qcut(coef, 3, labels=["bajo", "medio", "alto"]).astype(object).fillna("fuera del ranking")
+    return pd.DataFrame({
+        "rendimiento comparado con su puesto": pd.qcut(score_posicion(datos), 3,
+                                                       labels=["bajo", "medio", "alto"]).astype(object),
+        "nivel UEFA del club de origen": club,
+        "liga de origen": np.where(datos["club_origen_liga_es_top5"], "liga top 5", "otra liga"),
+        "edad al fichar": pd.cut(datos["edad_al_fichaje"], [15, 19, 23, 27, 45],
+                                 labels=["≤19", "20-23", "24-27", "28+"]).astype(object),
+        "puesto": datos["grupo_posicion"],
+    }, index=datos.index)

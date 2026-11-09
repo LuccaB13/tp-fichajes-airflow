@@ -1,4 +1,4 @@
-"""¿Qué hace falta para llegar a un club top 20? · Entrega 4 · Grupo 7
+"""¿Qué factores hacen que un jugador llegue a un club top 20? · Entrega 4 · Grupo 7
 
     streamlit run app/app.py
 
@@ -27,9 +27,6 @@ alt.data_transformers.disable_max_rows()
 #   naranja   = el modelo dijo top 20 y no fue
 #   gris      = no fue a un top 20
 AZUL, CELESTE, NARANJA, GRIS = "#2a78d6", "#9cc3ef", "#d95926", "#b5b4ae"
-RESULTADOS = ["acierto: llegó y lo señaló", "se le escapó: llegó y no lo señaló",
-              "falso positivo: lo señaló y no llegó", "negativo: no llegó y no lo señaló"]
-COLOR_RESULTADO = alt.Scale(domain=RESULTADOS, range=[AZUL, CELESTE, NARANJA, GRIS])
 
 NOMBRES_STATS = {
     "stat_minutes": "Minutos", "stat_matches": "Partidos", "stat_goals": "Goles", "stat_xg": "xG",
@@ -44,7 +41,7 @@ NOMBRES_STATS = {
     "stat_high_claims": "Salidas por arriba",
 }
 
-st.set_page_config(page_title="¿Quién llega a un club top 20?", page_icon="⚽", layout="wide")
+st.set_page_config(page_title="¿Qué lleva a un jugador a un top 20?", page_icon="⚽", layout="wide")
 
 
 @st.cache_resource
@@ -88,25 +85,45 @@ st.markdown("""
 </style>""", unsafe_allow_html=True)
 
 # =============================================================================== PORTADA
+FACTORES_TALLO = ["rendimiento comparado con su puesto", "nivel UEFA del club de origen", "edad al fichar", "puesto"]
+
+
+def tasa_por_nivel(datos, factor):
+    """% real que fue a un top 20 y probabilidad media del modelo, por nivel del factor."""
+    g = datos.groupby(factor)
+    tabla = pd.DataFrame({"fichajes": g.size(), "tasa": g["es_destino_top_20"].mean(), "modelo": g["proba"].mean()})
+    orden = [n for n in m.ORDEN_NIVELES[factor] if n in tabla.index]
+    return tabla.loc[orden].reset_index(names="nivel")
+
+
+rend = tasa_por_nivel(fichajes, "rendimiento comparado con su puesto").set_index("nivel")["tasa"]
+liga = tasa_por_nivel(fichajes, "liga de origen").set_index("nivel")["tasa"]
+joven = fichajes["edad al fichar"].eq("≤19")
+tasa_joven, tasa_resto = fichajes.loc[joven, "es_destino_top_20"].mean(), fichajes.loc[~joven, "es_destino_top_20"].mean()
+
 st.markdown('<div class="etiqueta">El proyecto</div>', unsafe_allow_html=True)
-st.title("¿Qué hace falta para que un jugador llegue a un club top 20 de Europa?")
+st.title("¿Qué factores hacen que un jugador llegue a un club top 20 de Europa?")
 st.write(
-    "Cada temporada, miles de jugadores cambian de club. Unos pocos terminan en uno de los 20 clubes con "
-    "mejor coeficiente UEFA. Con lo que se sabe **antes** del fichaje —cómo jugó la temporada anterior, su "
-    "edad, su puesto y de qué club viene—, ¿se puede anticipar quién?")
+    "Cada temporada, miles de jugadores cambian de club. Unos pocos terminan en uno de los 20 clubes con mejor "
+    "coeficiente UEFA. ¿Qué tienen en común? Miramos lo que se sabe **antes** del fichaje —cómo jugó la temporada "
+    "anterior, de qué club viene, su edad y su puesto— y cuánto pesa cada cosa.")
 st.markdown(
-    f'<div class="idea">Con lo que se sabe antes del fichaje, el modelo arma una lista donde 2 de cada 5 jugadores '
-    f'llegan a un top 20, y {pct(fp_cerca)} de los que no llegan terminan en un club que está justo debajo.</div>',
-    unsafe_allow_html=True)
+    '<div class="idea">Lo que más acerca a un jugador a un top 20 es cómo rindió comparado con su puesto y de qué club '
+    'viene; ser muy joven suma, y el puesto casi no importa.</div>', unsafe_allow_html=True)
 c1, c2, c3 = st.columns(3)
-c1.markdown(f'<div class="cifra">{num(t["f1"])}</div>f1 macro en el test, contra {num(resumen["piso"]["media"])} '
-            'del piso que dice siempre «no llega»', unsafe_allow_html=True)
-c2.markdown(f'<div class="cifra">2 de cada 5</div>de los jugadores que señala llegan a un top 20 '
-            f'(precision {num(t["precision"], 2)}; la tasa general es 1 de cada 10)', unsafe_allow_html=True)
-c3.markdown(f'<div class="cifra">{pct(fp_cerca)}</div>de los que señala y no llegan fueron a un club del puesto '
-            '21 al 100 de UEFA: casi aciertos', unsafe_allow_html=True)
+c1.markdown(f'<div class="cifra">×{rend["alto"] / rend["bajo"]:.0f}</div>'
+            f'llegan a un top 20 los que más rindieron para su puesto ({pct(rend["alto"], 1)}) contra los que menos '
+            f'({pct(rend["bajo"], 1)})', unsafe_allow_html=True)
+c2.markdown(f'<div class="cifra">×{num(liga["liga top 5"] / liga["otra liga"], 1)}</div>'
+            f'si viene de una liga top 5 ({pct(liga["liga top 5"], 1)}) que si viene de otra ({pct(liga["otra liga"], 1)})',
+            unsafe_allow_html=True)
+c3.markdown(f'<div class="cifra">×{tasa_joven / tasa_resto:.0f}</div>'
+            f'si ficha con 19 años o menos ({pct(tasa_joven, 1)}) que si es mayor ({pct(tasa_resto, 1)})',
+            unsafe_allow_html=True)
 st.caption(f"Medido sobre {miles(resumen['n_ana'])} fichajes de {miles(resumen['n_jugadores'])} jugadores, cinco "
-           f"temporadas (2022/23 a 2026/27). Datos del pipeline: {resumen['datos']}.")
+           f"temporadas (2022/23 a 2026/27). Un random forest que predice el destino con estos datos (f1 macro "
+           f"{num(t['f1'])} en el test, contra {num(resumen['piso']['media'])} del piso) usa los factores en el mismo "
+           f"orden. Datos del pipeline: {resumen['datos']}.")
 
 # =============================================================================== TALLO 1 · LOS DATOS
 st.markdown('<div class="etiqueta">Los datos</div>', unsafe_allow_html=True)
@@ -166,84 +183,110 @@ de su país, y si viene de una liga top 5, de un filial o de Europa.
 """)
 
 # =============================================================================== TALLO 2 · LO QUE ENCONTRAMOS
+st.markdown('<div class="etiqueta">Lo que encontramos</div>', unsafe_allow_html=True)
+st.header("Tres factores separan a los que llegan: el rendimiento, el club de origen y la juventud; el puesto no")
+TITULOS_PANEL = {"rendimiento comparado con su puesto": "Rendimiento para su puesto (tercios)",
+                 "nivel UEFA del club de origen": "Nivel UEFA del club de origen",
+                 "edad al fichar": "Edad al fichar", "puesto": "Puesto"}
+ESCALA_TASA = alt.Scale(domain=[0, 0.25])
+referencia = alt.Chart(pd.DataFrame({"tasa": [resumen["tasa_top20"]]})).mark_rule(
+    strokeDash=[4, 3], color="#777").encode(y=alt.Y("tasa:Q", scale=ESCALA_TASA))
+paneles = []
+for k, factor in enumerate(FACTORES_TALLO):
+    tabla = tasa_por_nivel(fichajes, factor)
+    tabla["nivel_corto"] = (tabla["nivel"].str.replace("Mediocampo", "Medio.").str.replace("Delantero", "Del.")
+                            .str.replace("Defensor", "Def."))
+    base_p = alt.Chart(tabla).encode(x=alt.X("nivel_corto:N", sort=list(tabla["nivel_corto"]), title=None,
+                                             axis=alt.Axis(labelAngle=-40 if factor == "puesto" else 0,
+                                                           labelOverlap=False, labelLimit=120)))
+    barras_p = base_p.mark_bar(color=AZUL).encode(
+        y=alt.Y("tasa:Q", scale=ESCALA_TASA, axis=alt.Axis(format="%", title="% que va a un top 20" if k == 0 else None,
+                                                           labels=k == 0, ticks=k == 0)),
+        tooltip=[alt.Tooltip("nivel:N"), alt.Tooltip("tasa:Q", format=".1%", title="% top 20"),
+                 alt.Tooltip("fichajes:Q")])
+    textos_p = base_p.mark_text(dy=-7, fontSize=11, color="#333").encode(
+        y=alt.Y("tasa:Q", scale=ESCALA_TASA), text=alt.Text("tasa:Q", format=".0%"))
+    paneles.append((barras_p + textos_p + referencia).properties(width=170 if factor != "puesto" else 300, height=240,
+                                                                title=TITULOS_PANEL[factor]))
+st.altair_chart(alt.hconcat(*paneles).resolve_scale(y="shared"), width="content")
+st.write(
+    f"Cada panel es un factor, con **la misma escala**; la línea punteada es la tasa general "
+    f"({pct(resumen['tasa_top20'], 1)}). En los tres primeros la barra de la derecha está muy por encima de la de la "
+    "izquierda: rendir más que los de su puesto, venir de un club fuerte en UEFA y llegar muy joven multiplican las "
+    "chances. En el último, todas las barras quedan pegadas a la línea: el puesto no cambia casi nada.")
+
 h5 = pd.DataFrame(resumen["h5"])
 alto_alto = h5.query("origen == 'alto' and rendimiento == 'alto'")["tasa"].iloc[0]
 bajo_alto = h5.query("origen == 'bajo' and rendimiento == 'alto'")["tasa"].iloc[0]
-st.markdown('<div class="etiqueta">Lo que encontramos</div>', unsafe_allow_html=True)
-st.header("Con el mismo rendimiento, venir de un club fuerte multiplica por cuatro las chances de llegar a un top 20")
-orden = ["bajo", "medio", "alto"]
-base_h5 = alt.Chart(h5).encode(
-    x=alt.X("rendimiento:O", sort=orden, title="rendimiento la temporada anterior, comparado con su puesto (tercios)"),
-    y=alt.Y("origen:O", sort=orden[::-1], title="nivel del club de origen en UEFA (tercios)"))
-celdas = base_h5.mark_rect().encode(
-    color=alt.Color("tasa:Q", scale=alt.Scale(scheme="blues", domain=[0, 0.4]),
-                    legend=alt.Legend(title="% que va a un top 20", format=".0%")),
-    tooltip=[alt.Tooltip("origen:O", title="club de origen"), alt.Tooltip("rendimiento:O"),
-             alt.Tooltip("tasa:Q", format=".1%", title="% top 20"), alt.Tooltip("n:Q", title="fichajes")])
-numeros = base_h5.mark_text(fontSize=16).encode(
-    text=alt.Text("tasa:Q", format=".1%"),
-    color=alt.condition(alt.datum.tasa > 0.2, alt.value("white"), alt.value("#222")))
-st.altair_chart((celdas + numeros).properties(height=300), width="stretch")
-st.write(
-    f"Mirá la columna de la derecha: jugadores que rindieron igual de bien. Si venían de un club de nivel UEFA bajo, "
-    f"llegó a un top 20 el {pct(bajo_alto, 1)}; si venían de uno alto, el {pct(alto_alto, 1)}. Y bajando por cualquier "
-    "fila pasa lo mismo con el rendimiento: **los dos ejes suman por su lado**. El club de origen no repite lo que ya "
-    "dicen las estadísticas: mide el contexto en el que se generaron.")
-
 with st.expander("Cómo lo sabemos"):
     st.markdown("""
-**Una hipótesis que se sostuvo (Hipótesis 5, club de origen).** El coeficiente UEFA del club de origen separa a los que
-llegan a un top 20 del resto: separación estandarizada **0,749** (amarillo) entre jugadores con estadísticas. Partido
-por liga, fuera de las ligas top 5 sube a **0,895** (verde), y dentro cae a 0,318: ahí la liga ya hace de filtro. Y casi
-no se correlaciona con el rendimiento (Spearman **0,18**, rojo): mide otra cosa. Por eso el bloque del club de origen
-entró al modelo, y sacarlo baja el f1 0,039.
+**Hipótesis que se sostuvieron** (Entrega 2, separación estandarizada entre los que van a un top 20 y el resto):
+- **Rendimiento (Hipótesis 4):** el puntaje de rendimiento separa **0,815**, verde.
+- **Club de origen (Hipótesis 5):** su coeficiente UEFA separa **0,749** (amarillo); fuera de las ligas top 5, **0,895**
+  (verde). Y casi no se correlaciona con el rendimiento (Spearman **0,18**): mide otra cosa, el contexto.
+- **Edad (Hipótesis 6):** sola separa poco (**0,143**, rojo) porque no es una recta: el salto está en los 19 años o
+  menos. Cruzada con los minutos aparece con fuerza.
 
-**Una que no se sostuvo (Hipótesis 2, altura).** Pensábamos que los top 20 fichan jugadores más altos. Separación
-**0,044**, rojo: 0,3 cm de diferencia. La altura no entró al modelo.
+**Una que no se sostuvo (Hipótesis 2, altura):** separación **0,044**, rojo: 0,3 cm de diferencia. La altura no entró al
+modelo.
 
-**Y la que agregamos (Hipótesis 6, edad).** Sola separa poco (0,143, rojo), pero no es una recta: los de 19 años o
-menos llegan el 19 % de las veces y el resto alrededor del 10 %. Cruzada con los minutos aparece con fuerza. Entró al
-modelo numérica, para que aprenda su forma solo.
+**Los dos primeros factores suman por separado.** Cruzando club de origen y rendimiento (tercios de cada uno), con el
+mismo rendimiento alto, venir de un club de nivel bajo da""" + f""" {pct(bajo_alto, 1)} y de uno alto {pct(alto_alto, 1)}:""")
+    orden = ["bajo", "medio", "alto"]
+    base_h5 = alt.Chart(h5).encode(
+        x=alt.X("rendimiento:O", sort=orden, title="rendimiento para su puesto"),
+        y=alt.Y("origen:O", sort=orden[::-1], title="nivel UEFA del club de origen"))
+    st.altair_chart((base_h5.mark_rect().encode(
+        color=alt.Color("tasa:Q", scale=alt.Scale(scheme="blues", domain=[0, 0.4]),
+                        legend=alt.Legend(title="% top 20", format=".0%")),
+        tooltip=[alt.Tooltip("tasa:Q", format=".1%", title="% top 20"), alt.Tooltip("n:Q", title="fichajes")])
+        + base_h5.mark_text(fontSize=14).encode(text=alt.Text("tasa:Q", format=".1%"),
+                                                color=alt.condition(alt.datum.tasa > 0.2, alt.value("white"),
+                                                                    alt.value("#222"))))
+        .properties(height=220, width=420), width="content")
+    st.markdown("""
+**Cómo se construyó el gráfico principal.** Cada barra es el % de los fichajes de ese nivel que fue a un top 20.
+- **Rendimiento:** el puntaje de la Entrega 2, el promedio de las 7 estadísticas propias del puesto (minutos, partidos y
+  5 del rol), cada una pasada a z **dentro de su puesto**, así un central se compara con centrales. Cortado en tercios
+  con la misma cantidad de fichajes.
+- **Club de origen:** su coeficiente UEFA en escala logarítmica, en tercios, más los clubes que no están en el ranking.
+- **Edad** en cuatro grupos, y el **puesto** en los 7 roles.
 
-**Cómo se construyó el gráfico.** El rendimiento es el puntaje de la Entrega 2: para cada jugador, el promedio de sus 7
-estadísticas propias del puesto (minutos, partidos y 5 del rol), cada una pasada a z **dentro de su puesto**, así un
-central se compara con centrales. El nivel del club es su coeficiente UEFA en escala logarítmica. Los dos se cortan en
-tercios con la misma cantidad de fichajes, y cada celda es el % que fue a un top 20. Quedan afuera los clubes que no están
-en el ranking UEFA (no tienen coeficiente). Se calcula sobre la población actual (7.410 fichajes); la Entrega 2 usaba
-7.437, antes de sacar el cruce roto, y por eso las cifras cambian en décimas.
+La escala vertical es la misma en los cuatro paneles (Unidad 4, 5.4: cuando los paneles se comparan, la escala se
+comparte) y llega hasta 25 %, para que la línea del 10 % quede a la vista. Se calcula sobre los 7.410 fichajes de la
+población actual; la Entrega 2 usaba 7.437 (antes de sacar el cruce roto), y por eso las cifras cambian en décimas.
 """)
 
 # =============================================================================== TALLO 3 · EL MODELO
-clubes_test = pd.DataFrame(resumen["clubes_test"]).head(12)
-porto = clubes_test.set_index("club").loc["FC Porto"]
+bloques = pd.DataFrame(resumen["bloques"])
+bloques["factor_corto"] = bloques["factor"].str.replace(r" \(.*\)", "", regex=True)
 st.markdown('<div class="etiqueta">El modelo</div>', unsafe_allow_html=True)
-st.header("El modelo encuentra a 4 de cada 10 que llegan a un top 20; los que se le escapan van sobre todo a "
-          "Porto, Roma y Benfica, que fichan como clubes medianos")
-largo_c = clubes_test.melt(id_vars="club", value_vars=["encontrados", "perdidos"], var_name="qué pasó",
-                           value_name="fichajes")
-largo_c["qué pasó"] = largo_c["qué pasó"].replace({"encontrados": "el modelo lo encontró",
-                                                   "perdidos": "se le escapó"})
-barras_c = alt.Chart(largo_c).mark_bar().encode(
-    y=alt.Y("club:N", sort=list(clubes_test["club"]), title="club top 20 de destino",
-            axis=alt.Axis(labelLimit=220, labelOverlap=False)),
-    x=alt.X("fichajes:Q", title="fichajes del test que llegaron a ese club", stack="zero"),
-    color=alt.Color("qué pasó:N", scale=alt.Scale(domain=["el modelo lo encontró", "se le escapó"],
-                                                 range=[AZUL, CELESTE]),
-                    legend=alt.Legend(title=None, orient="top")),
-    order=alt.Order("qué pasó:N"),
-    tooltip=["club", "qué pasó", "fichajes"])
-st.altair_chart(barras_c.properties(height=420), width="stretch")
+st.header("El modelo confirma el orden: lo que más usa es el rendimiento, y después el club de origen")
+barras_b = alt.Chart(bloques).mark_bar(color=AZUL).encode(
+    y=alt.Y("factor_corto:N", sort="-x", title=None, axis=alt.Axis(labelLimit=220)),
+    x=alt.X("caida:Q", title="cuánto cae el f1 macro del test al desordenar el factor entero"),
+    tooltip=[alt.Tooltip("factor:N"), alt.Tooltip("caida:Q", format=".3f", title="caída del f1"),
+             alt.Tooltip("desvio:Q", format=".3f", title="desvío")])
+errores_b = alt.Chart(bloques).mark_errorbar(color="#1d2329").encode(
+    y=alt.Y("factor_corto:N", sort="-x"), x=alt.X("min:Q"), x2="max:Q"
+).transform_calculate(min="datum.caida - datum.desvio", max="datum.caida + datum.desvio")
+cero = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#555").encode(x="x:Q")
+st.altair_chart((barras_b + errores_b + cero).properties(height=230), width="stretch")
+b = bloques.set_index("factor_corto")["caida"]
 st.write(
-    f"Cada barra son los jugadores del test que fueron a ese club top 20: en azul los que el modelo señaló, en celeste "
-    f"los que no. Encuentra {pct(t['recall'])} en total, pero no por igual: al Real Madrid o al Atlético los ve, y del "
-    f"Porto se le escapan {int(porto['perdidos'])} de {int(porto['perdidos'] + porto['encontrados'])}. Esos clubes están "
-    "en el top 20 por sus resultados en copas europeas, pero compran en Portugal, Brasil o la liga de al lado, jugadores "
-    "que se parecen a cualquier otro fichaje de esas ligas. Las columnas dicen quién es el jugador, no quién lo compra.")
+    f"Entrenamos un random forest que predice si el fichaje va a un top 20, y después le preguntamos en qué se apoya: "
+    f"desordenamos cada factor entero en el test y medimos cuánto empeora. Sin el rendimiento pierde "
+    f"{num(b['rendimiento'])}, sin el club de origen {num(b['club de origen'])}; el puesto y la edad suman poco, y la "
+    "temporada nada. Es el mismo orden que mostraban los datos solos: el modelo no encontró un factor escondido, confirmó "
+    "los que ya se veían y midió cuánto pesa cada uno.")
 
 with st.expander("Cómo lo sabemos"):
     comp = pd.DataFrame(resumen["comparacion"])
     piso = resumen["piso"]["media"]
     st.markdown(f"""
+**Para qué un modelo.** Los gráficos de arriba miran un factor por vez. El modelo los mira todos juntos, así que dice
+cuánto aporta cada uno **con los demás presentes** (el club de origen no repite lo que ya dice el rendimiento).
+
 **La métrica: f1 macro.** Sólo el {pct(resumen['tasa_top20'])} de los fichajes llega a un top 20, así que la accuracy
 premia decir siempre «no» ({num(t['accuracy_siempre_no'])} sin encontrar a nadie). El f1 macro promedia el f1 de las dos
 clases con el mismo peso, y el f1 exige a la vez **precision** (de los que señala, cuántos llegan) y **recall** (de los
@@ -283,11 +326,24 @@ boosting empata con el bosque, pero no le gana a la logística por más que su p
 
 **En el test, una sola vez:** f1 macro **{num(t['f1'])}** (validación cruzada {num(rf.f1)} ± {num(rf.desvio)}),
 precision {num(t['precision'], 2)}, recall {num(t['recall'], 2)}, accuracy {num(t['accuracy'])}. De {t['vp'] + t['fn']}
-que llegaron, encontró {t['vp']}; de {t['vp'] + t['fp']} que señaló, {t['fp']} no llegaron.
+que llegaron, encontró {t['vp']}; de {t['vp'] + t['fp']} que señaló, {t['fp']} no llegaron: 2 de cada 5 señalados llegan,
+cuando la tasa general es 1 de cada 10.
 
-**Dónde se equivoca.** Los que se le escapan son los del gráfico de arriba. Los que señala de más tienen perfil de top
-20 y terminan **justo debajo**:
+**Dónde se equivoca.** Los que se le escapan van sobre todo a los clubes del top 20 que fichan como medianos (Porto,
+Roma, Benfica): compran jugadores sin perfil de top 20.
 """)
+    clubes_test = pd.DataFrame(resumen["clubes_test"]).head(12)
+    largo_c = clubes_test.melt(id_vars="club", value_vars=["encontrados", "perdidos"], var_name="qué pasó",
+                               value_name="fichajes")
+    largo_c["qué pasó"] = largo_c["qué pasó"].replace({"encontrados": "el modelo lo encontró",
+                                                       "perdidos": "se le escapó"})
+    st.altair_chart(alt.Chart(largo_c).mark_bar().encode(
+        y=alt.Y("club:N", sort=list(clubes_test["club"]), title=None, axis=alt.Axis(labelLimit=220, labelOverlap=False)),
+        x=alt.X("fichajes:Q", title="fichajes del test que llegaron a ese club top 20", stack="zero"),
+        color=alt.Color("qué pasó:N", scale=alt.Scale(domain=["el modelo lo encontró", "se le escapó"],
+                                                     range=[AZUL, CELESTE]), legend=alt.Legend(title=None, orient="top")),
+        order=alt.Order("qué pasó:N"), tooltip=["club", "qué pasó", "fichajes"]).properties(height=330), width="stretch")
+    st.markdown("Los que señala de más tienen perfil de top 20 y terminan **justo debajo**:")
     destino = pd.DataFrame({"destino real": list(resumen["fp_destino"]),
                             "falsos positivos": list(resumen["fp_destino"].values()),
                             "negativos": [resumen["vn_destino"][k] for k in resumen["fp_destino"]]})
@@ -304,83 +360,80 @@ que llegaron, encontró {t['vp']}; de {t['vp'] + t['fp']} que señaló, {t['fp']
 El {pct(fp_cerca)} de los falsos positivos fue a un club del puesto 21 al 100 (McTominay al Napoli, De Ketelaere al
 Milan): el corte en el puesto 20 no se ve en el perfil del jugador.
 
-**En qué se apoya** (importancia por permutación: cuánto cae el f1 del test al desordenar cada columna):
-""")
-    imp = pd.DataFrame(resumen["importancia"]).head(8)
-    st.altair_chart(alt.Chart(imp).mark_bar(color=AZUL).encode(
-        x=alt.X("caida:Q", title="caída del f1 macro"), y=alt.Y("columna:N", sort="-x", title=None),
-        tooltip=["columna", alt.Tooltip("caida:Q", format=".3f")]).properties(height=220), width="stretch")
-    st.markdown("""
-El puesto (que además define contra quién se compara cada estadística), el coeficiente y la liga del club de origen y la
-edad. Ninguna es fuga: todas existen antes del fichaje y no usan el destino. Las columnas parecidas se reparten la
-importancia, así que una baja no significa que no sirva: sin las 23 estadísticas el f1 cae 0,093.
+**Cómo se midió la importancia por factor.** Con el modelo ya entrenado, se desordenan **juntas** todas las columnas de
+un factor en el test (la misma barajada para todas), se vuelve a medir el f1 con el umbral del modelo, y lo que cae es
+lo que aporta ese factor. Se repite 10 veces por factor (la barra negra es ± un desvío). Se hace por factor y no por
+columna porque las columnas parecidas se reparten la importancia: cada una de las 23 estadísticas pesa poco sola, porque
+las otras la cubren. Sacando cada factor y reentrenando (Entrega 3, sección 7.1) el orden es el mismo: sin las
+estadísticas el f1 cae 0,093, sin el club de origen 0,039. Ninguno es fuga: todos existen antes del fichaje y no usan el
+destino.
 """)
 
 # =============================================================================== COPA · EXPLORÁ
 st.markdown('<div class="etiqueta">Tu turno · Explorá</div>', unsafe_allow_html=True)
-st.header(f"Los {miles(resumen['n_ana'])} fichajes, con lo que dijo el modelo de cada uno")
+st.header("Elegí un factor, achicá el universo y mirá quiénes son")
 st.write(
-    "Empezá por el panorama: cada punto es un fichaje, a la altura de la probabilidad que le dio el modelo. Arriba de la "
-    f"línea ({num(resumen['umbral'], 2)}) el modelo dice «llega». Después achicá el universo con los filtros y pasá el mouse "
-    "por un punto para ver quién es. Cada fichaje lo predice un modelo que no lo vio: los del entrenamiento salen de la "
-    "validación cruzada, los del test del modelo final.")
+    "Empezá por el panorama: para cada nivel del factor que elijas, la barra es el % de fichajes que fue a un top 20 y "
+    "la marca negra es la probabilidad media que les dio el modelo. Después achicá el universo con los filtros y **tocá "
+    "una barra** para ver los jugadores de ese grupo con lo que dijo el modelo de cada uno. Cada fichaje lo predice un "
+    "modelo que no lo vio: los del entrenamiento salen de la validación cruzada, los del test del modelo final.")
 
-EJES = {"Edad al fichar": "edad_al_fichaje", "Minutos la temporada anterior": "stat_minutes",
-        "Partidos la temporada anterior": "stat_matches", "Coeficiente UEFA del club de origen": "club_origen_coeficiente_uefa",
-        "Rendimiento comparado con su puesto": "score_posicion"}
-f1c, f2c, f3c, f4c = st.columns([1.2, 1.2, 1, 1.2])
-eje = f1c.selectbox("Eje horizontal", list(EJES), index=1)
-puesto = f2c.selectbox("Puesto", ["Todos"] + m.ROLES)
-origen = f3c.radio("Club de origen", ["Todos", "Liga top 5", "Fuera de las top 5"])
+NOMBRE_FACTOR = {"rendimiento comparado con su puesto": "Rendimiento para su puesto",
+                 "nivel UEFA del club de origen": "Nivel UEFA del club de origen",
+                 "liga de origen": "Liga de origen", "edad al fichar": "Edad al fichar", "puesto": "Puesto"}
+f1c, f2c, f3c, f4c = st.columns([1.3, 1.2, 1, 1.3])
+factor = f1c.selectbox("Factor", list(NOMBRE_FACTOR), format_func=NOMBRE_FACTOR.get)
+puesto = f2c.selectbox("Puesto", ["Todos"] + m.ROLES, disabled=factor == "puesto")
+origen = f3c.radio("Liga de origen", ["Todas", "Liga top 5", "Otra liga"], disabled=factor == "liga de origen")
 temporadas_sel = f4c.multiselect("Temporadas", sorted(fichajes["temporada_fichaje"].unique()),
                                  default=sorted(fichajes["temporada_fichaje"].unique()))
-resultados_sel = st.multiselect("Qué pasó", RESULTADOS, default=RESULTADOS)
 
-vista = fichajes[fichajes["temporada_fichaje"].isin(temporadas_sel) & fichajes["resultado"].isin(resultados_sel)]
-if puesto != "Todos":
+vista = fichajes[fichajes["temporada_fichaje"].isin(temporadas_sel)]
+if puesto != "Todos" and factor != "puesto":
     vista = vista[vista["grupo_posicion"] == puesto]
-if origen != "Todos":
+if origen != "Todas" and factor != "liga de origen":
     vista = vista[vista["club_origen_liga_es_top5"] == (origen == "Liga top 5")]
-vista = vista.copy()
-col_x = EJES[eje]
-if col_x == "edad_al_fichaje":  # la edad es entera: un poco de ruido fijo para que no se tapen
-    vista["x"] = vista[col_x] + np.random.default_rng(m.SEMILLA).uniform(-0.35, 0.35, len(vista))
+
+if vista.empty:
+    st.info("No quedan fichajes con estos filtros.")
 else:
-    vista["x"] = vista[col_x].fillna(0)
-vista["destino"] = vista["club_destino"] + " (puesto " + vista["club_destino_ranking_uefa"].astype(str) + ")"
-escala_x = alt.Scale(type="symlog") if col_x in ("club_origen_coeficiente_uefa", "stat_minutes") else alt.Scale(zero=False)
+    panorama = tasa_por_nivel(vista, factor)
+    st.caption(f"{miles(len(vista))} fichajes con estos filtros · la línea punteada es la tasa de este universo "
+               f"({pct(vista['es_destino_top_20'].mean(), 1)})")
+    seleccion = alt.selection_point(name="nivel_elegido", fields=["nivel"])
+    base_e = alt.Chart(panorama).encode(x=alt.X("nivel:N", sort=list(panorama["nivel"]), title=NOMBRE_FACTOR[factor],
+                                                axis=alt.Axis(labelAngle=-30 if factor == "puesto" else 0)))
+    barras_e = base_e.mark_bar(color=AZUL, cursor="pointer").encode(
+        y=alt.Y("tasa:Q", title="% que va a un top 20", axis=alt.Axis(format="%")),
+        opacity=alt.condition(seleccion, alt.value(1), alt.value(0.35)),
+        tooltip=[alt.Tooltip("nivel:N"), alt.Tooltip("fichajes:Q"),
+                 alt.Tooltip("tasa:Q", format=".1%", title="% que fue a un top 20"),
+                 alt.Tooltip("modelo:Q", format=".1%", title="probabilidad media del modelo")]
+    ).add_params(seleccion)
+    marcas_modelo = base_e.mark_tick(color="#1d2329", thickness=3, size=40).encode(y="modelo:Q")
+    tasa_vista = alt.Chart(pd.DataFrame({"t": [vista["es_destino_top_20"].mean()]})).mark_rule(
+        strokeDash=[4, 3], color="#777").encode(y="t:Q")
+    evento = st.altair_chart((barras_e + marcas_modelo + tasa_vista).properties(height=320), width="stretch",
+                             on_select="rerun", key="explora_barras")
 
-st.caption(f"{miles(len(vista))} fichajes con estos filtros.")
-puntos_e = alt.Chart(vista).mark_circle(size=28, opacity=0.65).encode(
-    x=alt.X("x:Q", title=eje, scale=escala_x),
-    y=alt.Y("proba:Q", title="probabilidad de llegar a un top 20 (según el modelo)", scale=alt.Scale(domain=[0, 1])),
-    color=alt.Color("resultado:N", scale=COLOR_RESULTADO,
-                    legend=alt.Legend(title=None, orient="top", columns=2, labelLimit=360)),
-    tooltip=[alt.Tooltip("nombre:N", title="jugador"), alt.Tooltip("temporada_fichaje:N", title="temporada"),
-             alt.Tooltip("grupo_posicion:N", title="puesto"), alt.Tooltip("edad_al_fichaje:Q", title="edad"),
-             alt.Tooltip("club_origen:N", title="de"), alt.Tooltip("destino:N", title="a"),
-             alt.Tooltip("proba:Q", format=".2f", title="probabilidad"), alt.Tooltip("resultado:N", title="qué pasó"),
-             alt.Tooltip("conjunto:N", title="predicho en")])
-umbral = alt.Chart(pd.DataFrame({"u": [resumen["umbral"]]})).mark_rule(strokeDash=[5, 4], color="#555").encode(y="u:Q")
-st.altair_chart((puntos_e + umbral).properties(height=460).interactive(), width="stretch")
-if col_x == "club_origen_coeficiente_uefa":
-    st.caption("Los clubes fuera del ranking UEFA aparecen en 0. Escala logarítmica, como en la Entrega 2.")
-
-with st.expander("Ver un fichaje en detalle"):
-    elegible = vista.sort_values("proba", ascending=False)
-    etiqueta = (elegible["nombre"] + " · " + elegible["temporada_fichaje"] + " · " + elegible["club_origen"] + " → "
-                + elegible["club_destino"])
-    if len(elegible):
-        i = st.selectbox("Fichaje (ordenados por probabilidad)", elegible.index, format_func=lambda k: etiqueta[k])
-        f = elegible.loc[i]
-        a, b, c = st.columns(3)
-        a.metric("Probabilidad según el modelo", num(f["proba"], 2))
-        b.metric("El modelo dijo", "llega" if f["proba"] >= resumen["umbral"] else "no llega")
-        c.metric("En realidad", "fue a un top 20" if f["es_destino_top_20"] else "no fue a un top 20")
-        st.write(f"**{f['nombre']}**, {f['grupo_posicion'].lower()}, {int(f['edad_al_fichaje'])} años. Venía de "
-                 f"{f['club_origen']} ({f['club_origen_liga']}) con {miles(f['stat_minutes'])} minutos y "
-                 f"fue a {f['club_destino']}, puesto {f['club_destino_ranking_uefa']} de UEFA. Predicho en el "
-                 f"{f['conjunto']}.")
+    elegidos = [p["nivel"] for p in evento.selection.get("nivel_elegido", []) if "nivel" in p]
+    if not elegidos:
+        st.markdown("👆 Tocá una barra para ver los jugadores de ese grupo.")
+    else:
+        grupo = vista[vista[factor].isin(elegidos)].sort_values("proba", ascending=False)
+        st.markdown(f"**{miles(len(grupo))} fichajes en «{', '.join(elegidos)}»**, ordenados por la probabilidad que les "
+                    f"dio el modelo. {int(grupo['es_destino_top_20'].sum())} fueron a un top 20.")
+        detalle = grupo.assign(destino=grupo["club_destino"] + " (puesto " + grupo["club_destino_ranking_uefa"].astype(str)
+                                       + ")")[["nombre", "temporada_fichaje", "grupo_posicion", "edad_al_fichaje",
+                                               "club_origen", "destino", "proba", "resultado"]]
+        st.dataframe(
+            detalle, hide_index=True, width="stretch", height=320,
+            column_config={"nombre": "jugador", "temporada_fichaje": "temporada", "grupo_posicion": "puesto",
+                           "edad_al_fichaje": st.column_config.NumberColumn("edad", format="%d"),
+                           "club_origen": "de", "destino": "a (club real)",
+                           "proba": st.column_config.ProgressColumn("probabilidad del modelo", min_value=0,
+                                                                    max_value=1, format="%.2f"),
+                           "resultado": "qué pasó"})
 
 # =============================================================================== COPA · PROBÁ EL MODELO
 st.markdown('<div class="etiqueta">Tu turno · Probá el modelo</div>', unsafe_allow_html=True)
@@ -487,8 +540,9 @@ st.caption(f"Para comparar: el {pct(resumen['tasa_top20'], 1)} de todos los fich
 # =============================================================================== CIERRE
 with st.expander("Qué cambió desde la Entrega 3"):
     st.markdown("""
-Ajustamos las cuatro familias de modelos **antes** de elegir (antes se comparaban con sus valores por defecto), y con eso
-el elegido pasó de la regresión logística al random forest. La edad entra **numérica** (antes, en tramos), y agregamos
+La aplicación y la sección 9 del notebook responden directamente la pregunta del proyecto: qué factores pesan y cuánto
+(importancia por factor y cómo usa el modelo cada uno). Ajustamos las cuatro familias de modelos **antes** de elegir
+(antes se comparaban con sus valores por defecto), y con eso el elegido pasó de la regresión logística al random forest. La edad entra **numérica** (antes, en tramos), y agregamos
 la hipótesis de la edad a la Entrega 2. La precision subió de 0,34 a 0,39 en el test, y los errores se analizan con
 nombres: a dónde fueron los que el modelo señaló de más y a qué clubes van los que se le escapan.
 """)
