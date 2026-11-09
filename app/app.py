@@ -41,7 +41,13 @@ NOMBRES_STATS = {
     "stat_high_claims": "Salidas por arriba",
 }
 
-st.set_page_config(page_title="¿Qué lleva a un jugador a un top 20?", page_icon="⚽", layout="wide")
+st.set_page_config(page_title="¿Qué lleva a un jugador a un top 20?", layout="wide")
+
+
+def grafico(chart, **kw):
+    """st.altair_chart con un margen interno, para que los títulos de los ejes no queden cortados en el borde."""
+    return st.altair_chart(chart.properties(padding={"left": 18, "top": 14, "right": 14, "bottom": 10}), **kw)
+
 
 
 @st.cache_resource
@@ -88,12 +94,19 @@ st.markdown("""
 FACTORES_TALLO = ["rendimiento comparado con su puesto", "nivel UEFA del club de origen", "edad al fichar", "puesto"]
 
 
+ETIQUETA_CORTA = {"fuera del ranking": "sin ranking", "Mediocampo defensivo": "Medio. defensivo",
+                  "Mediocampo ofensivo": "Medio. ofensivo", "Delantero centro": "Del. centro",
+                  "Delantero extremo": "Del. extremo", "Defensor central": "Def. central"}
+
+
 def tasa_por_nivel(datos, factor):
     """% real que fue a un top 20 y probabilidad media del modelo, por nivel del factor."""
     g = datos.groupby(factor)
     tabla = pd.DataFrame({"fichajes": g.size(), "tasa": g["es_destino_top_20"].mean(), "modelo": g["proba"].mean()})
     orden = [n for n in m.ORDEN_NIVELES[factor] if n in tabla.index]
-    return tabla.loc[orden].reset_index(names="nivel")
+    tabla = tabla.loc[orden].reset_index(names="nivel")
+    tabla["etiqueta"] = tabla["nivel"].map(lambda n: ETIQUETA_CORTA.get(n, n))
+    return tabla
 
 
 rend = tasa_por_nivel(fichajes, "rendimiento comparado con su puesto").set_index("nivel")["tasa"]
@@ -144,7 +157,7 @@ largo = temporadas.melt(id_vars=["temporada_fichaje", "tasa"], value_vars=["top2
                         var_name="destino", value_name="cantidad")
 largo["destino"] = largo["destino"].replace({"top20": "fue a un top 20", "no top 20": "no fue a un top 20"})
 barras = alt.Chart(largo).mark_bar().encode(
-    y=alt.Y("temporada_fichaje:N", title="temporada del fichaje"),
+    y=alt.Y("temporada_fichaje:N", title=None),
     x=alt.X("cantidad:Q", title="fichajes", stack="zero"),
     color=alt.Color("destino:N", scale=alt.Scale(domain=["fue a un top 20", "no fue a un top 20"],
                                                 range=[AZUL, GRIS]), legend=alt.Legend(title=None, orient="top")),
@@ -152,7 +165,7 @@ barras = alt.Chart(largo).mark_bar().encode(
     tooltip=["temporada_fichaje", "destino", "cantidad"])
 textos = alt.Chart(temporadas).mark_text(align="left", dx=4, color="#333").encode(
     y="temporada_fichaje:N", x=alt.X("fichajes:Q"), text=alt.Text("tasa:Q", format=".0%"))
-st.altair_chart((barras + textos).properties(height=230), width="stretch")
+grafico((barras + textos).properties(height=230), width="stretch")
 st.write(
     f"Cada barra es una temporada de fichajes; la parte azul, los que fueron a un top 20. El número a la derecha es "
     f"la proporción: entre 9 % y 11 % todos los años ({pct(resumen['tasa_top20'], 1)} en total). Por eso la "
@@ -181,7 +194,8 @@ temporada **anterior**. Un mismo jugador puede aparecer más de una vez (fichaje
         "las promociones del filial al primer equipo no son una compra: el destino ya era ese club",
         "el cruce con FotMob es por nombre; si una fuente dice arquero y la otra no, las stats son de otra persona",
     ]
-    st.dataframe(pasos, hide_index=True, width="stretch")
+    pasos["fichajes que quedan"] = pasos["fichajes que quedan"].map(miles)
+    st.table(pasos.set_index("paso"))
     st.markdown(f"""
 **Columnas que se descartaron por fuga** (existen recién **en** el fichaje, o se calculan con el destino):
 {", ".join(f"`{c}`" for c in resumen["fuga"])}. Todo lo del destino es la respuesta escrita de otra forma.
@@ -203,9 +217,7 @@ referencia = alt.Chart(pd.DataFrame({"tasa": [resumen["tasa_top20"]]})).mark_rul
 paneles = []
 for k, factor in enumerate(FACTORES_TALLO):
     tabla = tasa_por_nivel(fichajes, factor)
-    tabla["nivel_corto"] = (tabla["nivel"].str.replace("Mediocampo", "Medio.").str.replace("Delantero", "Del.")
-                            .str.replace("Defensor", "Def."))
-    base_p = alt.Chart(tabla).encode(x=alt.X("nivel_corto:N", sort=list(tabla["nivel_corto"]), title=None,
+    base_p = alt.Chart(tabla).encode(x=alt.X("etiqueta:N", sort=list(tabla["etiqueta"]), title=None,
                                              axis=alt.Axis(labelAngle=-40 if factor == "puesto" else 0,
                                                            labelOverlap=False, labelLimit=120)))
     barras_p = base_p.mark_bar(color=AZUL).encode(
@@ -215,9 +227,9 @@ for k, factor in enumerate(FACTORES_TALLO):
                  alt.Tooltip("fichajes:Q")])
     textos_p = base_p.mark_text(dy=-7, fontSize=11, color="#333").encode(
         y=alt.Y("tasa:Q", scale=ESCALA_TASA), text=alt.Text("tasa:Q", format=".0%"))
-    paneles.append((barras_p + textos_p + referencia).properties(width=170 if factor != "puesto" else 300, height=240,
+    paneles.append((barras_p + textos_p + referencia).properties(width={"puesto": 300, "nivel UEFA del club de origen": 210}.get(factor, 170), height=240,
                                                                 title=TITULOS_PANEL[factor]))
-st.altair_chart(alt.hconcat(*paneles).resolve_scale(y="shared"), width="content")
+grafico(alt.hconcat(*paneles).resolve_scale(y="shared"), width="content")
 st.write(
     f"Cada panel es un factor, con **la misma escala**; la línea punteada es la tasa general "
     f"({pct(resumen['tasa_top20'], 1)}). En los tres primeros la barra de la derecha está muy por encima de la de la "
@@ -243,16 +255,16 @@ modelo.
 mismo rendimiento alto, venir de un club de nivel bajo da""" + f""" {pct(bajo_alto, 1)} y de uno alto {pct(alto_alto, 1)}:""")
     orden = ["bajo", "medio", "alto"]
     base_h5 = alt.Chart(h5).encode(
-        x=alt.X("rendimiento:O", sort=orden, title="rendimiento para su puesto"),
-        y=alt.Y("origen:O", sort=orden[::-1], title="nivel UEFA del club de origen"))
-    st.altair_chart((base_h5.mark_rect().encode(
+        x=alt.X("rendimiento:O", sort=orden, title="rendimiento para su puesto", axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("origen:O", sort=orden[::-1], title="club de origen", axis=alt.Axis(titlePadding=10)))
+    grafico((base_h5.mark_rect().encode(
         color=alt.Color("tasa:Q", scale=alt.Scale(scheme="blues", domain=[0, 0.4]),
                         legend=alt.Legend(title="% top 20", format=".0%")),
         tooltip=[alt.Tooltip("tasa:Q", format=".1%", title="% top 20"), alt.Tooltip("n:Q", title="fichajes")])
         + base_h5.mark_text(fontSize=14).encode(text=alt.Text("tasa:Q", format=".1%"),
                                                 color=alt.condition(alt.datum.tasa > 0.2, alt.value("white"),
                                                                     alt.value("#222"))))
-        .properties(height=220, width=420), width="content")
+        .properties(height=240, width=460), width="content")
     st.markdown("""
 **Cómo se construyó el gráfico principal.** Cada barra es el % de los fichajes de ese nivel que fue a un top 20.
 - **Rendimiento:** el puntaje de la Entrega 2, el promedio de las 7 estadísticas propias del puesto (minutos, partidos y
@@ -269,25 +281,31 @@ población actual; la Entrega 2 usaba 7.437 (antes de sacar el cruce roto), y po
 # =============================================================================== TALLO 3 · EL MODELO
 bloques = pd.DataFrame(resumen["bloques"])
 bloques["factor_corto"] = bloques["factor"].str.replace(r" \(.*\)", "", regex=True)
+# lo que el modelo aprendió es lo que saca por encima del piso; cada factor, qué parte de eso se pierde sin él
+aprendido = t["f1"] - resumen["piso"]["media"]
+bloques["pierde"] = (bloques["caida"] / aprendido).clip(lower=0)
+bloques["rotulo"] = bloques["pierde"].map(lambda v: pct(v))
+b = bloques.set_index("factor_corto")["pierde"]
 st.markdown('<div class="etiqueta">El modelo</div>', unsafe_allow_html=True)
-st.header("El modelo confirma el orden: lo que más usa es el rendimiento, y después el club de origen")
-barras_b = alt.Chart(bloques).mark_bar(color=AZUL).encode(
-    y=alt.Y("factor_corto:N", sort="-x", title=None, axis=alt.Axis(labelLimit=220)),
-    x=alt.X("caida:Q", title="cuánto cae el f1 macro del test al desordenar el factor entero"),
-    tooltip=[alt.Tooltip("factor:N"), alt.Tooltip("caida:Q", format=".3f", title="caída del f1"),
-             alt.Tooltip("desvio:Q", format=".3f", title="desvío")])
-errores_b = alt.Chart(bloques).mark_errorbar(color="#1d2329").encode(
-    y=alt.Y("factor_corto:N", sort="-x"), x=alt.X("min:Q"), x2="max:Q"
-).transform_calculate(min="datum.caida - datum.desvio", max="datum.caida + datum.desvio")
-cero = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#555").encode(x="x:Q")
-st.altair_chart((barras_b + errores_b + cero).properties(height=230), width="stretch")
-b = bloques.set_index("factor_corto")["caida"]
+st.header(f"El modelo confirma el orden: sin el rendimiento pierde más de la mitad de lo que aprendió, y sin el club "
+          f"de origen más de un tercio")
+orden_b = list(bloques.sort_values("pierde", ascending=False)["factor_corto"])
+base_b = alt.Chart(bloques).encode(y=alt.Y("factor_corto:N", sort=orden_b, title=None, axis=alt.Axis(labelLimit=220)))
+barras_b = base_b.mark_bar(color=AZUL).encode(
+    x=alt.X("pierde:Q", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 0.7]),
+            title="parte de lo que aprendió el modelo que se pierde sin ese factor"),
+    tooltip=[alt.Tooltip("factor:N"), alt.Tooltip("pierde:Q", format=".0%", title="se pierde")])
+textos_b = base_b.mark_text(align="left", dx=5, fontSize=13, color="#1d2329").encode(
+    x=alt.X("pierde:Q", scale=alt.Scale(domain=[0, 0.7])), text="rotulo:N")
+grafico((barras_b + textos_b).properties(height=210), width="stretch")
 st.write(
-    f"Entrenamos un random forest que predice si el fichaje va a un top 20, y después le preguntamos en qué se apoya: "
-    f"desordenamos cada factor entero en el test y medimos cuánto empeora. Sin el rendimiento pierde "
-    f"{num(b['rendimiento'])}, sin el club de origen {num(b['club de origen'])}; el puesto y la edad suman poco, y la "
-    "temporada nada. Es el mismo orden que mostraban los datos solos: el modelo no encontró un factor escondido, confirmó "
-    "los que ya se veían y midió cuánto pesa cada uno.")
+    "Entrenamos un random forest que predice si el fichaje va a un top 20, con todos los factores juntos. Después le "
+    "sacamos un factor por vez —mezclando esa información entre los jugadores, para que no la pueda usar— y medimos "
+    f"cuánto empeora. Sin el rendimiento pierde el {pct(b['rendimiento'])} de lo que había aprendido, y sin el club de "
+    f"origen el {pct(b['club de origen'])}; el puesto y la edad suman poco, y la temporada nada. Es el mismo orden que "
+    "mostraban los datos solos: el modelo no encontró un factor escondido, confirmó los que ya se veían y midió cuánto "
+    "pesa cada uno. Los porcentajes no suman 100 % porque los factores se superponen en parte (los jugadores de clubes "
+    "fuertes también suelen rendir más).")
 
 with st.expander("Cómo lo sabemos"):
     comp = pd.DataFrame(resumen["comparacion"])
@@ -315,15 +333,18 @@ modelo usa su mejor umbral.
 """)
     tabla = comp.assign(**{"hiperparámetros": comp["params"].astype(str)})[
         ["familia", "hiperparámetros", "umbral", "f1", "desvio", "precision", "recall"]]
-    st.dataframe(tabla.round(3), hide_index=True, width="stretch")
+    tabla = tabla.assign(**{c: tabla[c].map(lambda v: num(v, 3)) for c in ["f1", "desvio", "precision", "recall"]},
+                         umbral=tabla["umbral"].map(lambda v: num(v, 2)))
+    st.table(tabla.set_index("familia"))
     puntos = alt.Chart(comp).mark_point(filled=True, size=90, color=AZUL).encode(
         x=alt.X("f1:Q", scale=alt.Scale(domain=[0.46, 0.72]), title="f1 macro (media ± desvío)"),
-        y=alt.Y("familia:N", sort="-x", title=None))
+        y=alt.Y("familia:N", sort=list(comp.sort_values("f1", ascending=False)["familia"]), title=None))
     errores = alt.Chart(comp).mark_errorbar(color=AZUL).encode(
-        x=alt.X("min:Q", scale=alt.Scale(domain=[0.46, 0.72])), x2="max:Q", y=alt.Y("familia:N", sort="-x")
+        x=alt.X("min:Q", scale=alt.Scale(domain=[0.46, 0.72]), title="f1 macro (media ± desvío)"), x2="max:Q",
+        y=alt.Y("familia:N", sort=list(comp.sort_values("f1", ascending=False)["familia"]))
     ).transform_calculate(min="datum.f1 - datum.desvio", max="datum.f1 + datum.desvio")
     linea_piso = alt.Chart(pd.DataFrame({"piso": [piso]})).mark_rule(strokeDash=[4, 3], color="#777").encode(x="piso:Q")
-    st.altair_chart((errores + puntos + linea_piso).properties(height=170, title="Eje recortado de 0,46 a 0,72; "
+    grafico((errores + puntos + linea_piso).properties(height=170, title="Eje recortado de 0,46 a 0,72; "
                     "la línea punteada es el piso"), width="stretch")
     rf = comp.set_index("familia").loc["random forest"]
     rl = comp.set_index("familia").loc["regresión logística"]
@@ -346,36 +367,50 @@ Roma, Benfica): compran jugadores sin perfil de top 20.
                                value_name="fichajes")
     largo_c["qué pasó"] = largo_c["qué pasó"].replace({"encontrados": "el modelo lo encontró",
                                                        "perdidos": "se le escapó"})
-    st.altair_chart(alt.Chart(largo_c).mark_bar().encode(
+    grafico(alt.Chart(largo_c).mark_bar().encode(
         y=alt.Y("club:N", sort=list(clubes_test["club"]), title=None, axis=alt.Axis(labelLimit=220, labelOverlap=False)),
         x=alt.X("fichajes:Q", title="fichajes del test que llegaron a ese club top 20", stack="zero"),
         color=alt.Color("qué pasó:N", scale=alt.Scale(domain=["el modelo lo encontró", "se le escapó"],
                                                      range=[AZUL, CELESTE]), legend=alt.Legend(title=None, orient="top")),
         order=alt.Order("qué pasó:N"), tooltip=["club", "qué pasó", "fichajes"]).properties(height=330), width="stretch")
-    st.markdown("Los que señala de más tienen perfil de top 20 y terminan **justo debajo**:")
+    st.markdown("Los que señala de más tienen perfil de top 20 y terminan **justo debajo**. "
+                "**De los que no llegaron a un top 20, ¿a qué puesto UEFA fue su club?** (cada grupo suma 100 %)")
     destino = pd.DataFrame({"destino real": list(resumen["fp_destino"]),
                             "falsos positivos": list(resumen["fp_destino"].values()),
                             "negativos": [resumen["vn_destino"][k] for k in resumen["fp_destino"]]})
-    largo_d = destino.melt(id_vars="destino real", var_name="grupo", value_name="proporción")
-    st.altair_chart(alt.Chart(largo_d).mark_bar().encode(
-        x=alt.X("destino real:N", sort=list(resumen["fp_destino"]), title="a dónde fueron en realidad"),
-        xOffset="grupo:N",
-        y=alt.Y("proporción:Q", axis=alt.Axis(format="%"), title="% del grupo"),
-        color=alt.Color("grupo:N", scale=alt.Scale(domain=["falsos positivos", "negativos"], range=[NARANJA, GRIS]),
-                        legend=alt.Legend(title=None, orient="top")),
-        tooltip=["destino real", "grupo", alt.Tooltip("proporción:Q", format=".0%")]
-    ).properties(height=220), width="stretch")
+    base_d = alt.Chart(destino).encode(
+        x=alt.X("destino real:N", sort=list(resumen["fp_destino"]), title="a dónde fueron en realidad",
+                axis=alt.Axis(labelAngle=0)))
+    barras_d = base_d.mark_bar(color=NARANJA, size=60).encode(
+        y=alt.Y("falsos positivos:Q", axis=alt.Axis(format="%"), title="% del grupo", scale=alt.Scale(domain=[0, 0.6])),
+        tooltip=["destino real", alt.Tooltip("falsos positivos:Q", format=".0%", title="los que el modelo señaló"),
+                 alt.Tooltip("negativos:Q", format=".0%", title="el resto de los que no llegaron")])
+    textos_d = base_d.mark_text(dy=-8, color=NARANJA, fontWeight="bold").encode(
+        y=alt.Y("falsos positivos:Q", scale=alt.Scale(domain=[0, 0.6])), text=alt.Text("falsos positivos:Q", format=".0%"))
+    marcas_d = base_d.mark_tick(color="#1d2329", thickness=3, size=70).encode(
+        y=alt.Y("negativos:Q", scale=alt.Scale(domain=[0, 0.6])))
+    grafico((barras_d + textos_d + marcas_d).properties(height=240), width="stretch")
+    st.caption("Barras naranjas: los que el modelo señaló y no llegaron a un top 20. Marca negra: el resto de los que no "
+               "llegaron, como referencia de a dónde va un fichaje cualquiera.")
     st.markdown(f"""
 El {pct(fp_cerca)} de los falsos positivos fue a un club del puesto 21 al 100 (McTominay al Napoli, De Ketelaere al
 Milan): el corte en el puesto 20 no se ve en el perfil del jugador.
 
-**Cómo se midió la importancia por factor.** Con el modelo ya entrenado, se desordenan **juntas** todas las columnas de
-un factor en el test (la misma barajada para todas), se vuelve a medir el f1 con el umbral del modelo, y lo que cae es
-lo que aporta ese factor. Se repite 10 veces por factor (la barra negra es ± un desvío). Se hace por factor y no por
-columna porque las columnas parecidas se reparten la importancia: cada una de las 23 estadísticas pesa poco sola, porque
-las otras la cubren. Sacando cada factor y reentrenando (Entrega 3, sección 7.1) el orden es el mismo: sin las
-estadísticas el f1 cae 0,093, sin el club de origen 0,039. Ninguno es fuga: todos existen antes del fichaje y no usan el
-destino.
+**Cómo se midió lo que aporta cada factor** (importancia por permutación, Práctica 1, 5.4):
+1. El modelo final predice los fichajes del test y saca un f1 macro de {num(t['f1'])}. El piso, que dice siempre «no
+   llega», saca {num(resumen['piso']['media'])}: lo que el modelo **aprendió** es la diferencia, {num(aprendido)}.
+2. Se **mezcla** un factor entero entre los jugadores del test (por ejemplo, las 23 estadísticas de rendimiento, todas
+   con la misma mezcla): cada jugador queda con el rendimiento de otro, pero conserva su club, su edad y su puesto.
+3. El modelo vuelve a predecir. Como ese factor ya no corresponde a cada jugador, acierta menos.
+4. Lo que baja el f1 es lo que aportaba ese factor; dividido por lo aprendido, es la parte que se pierde. Con el
+   rendimiento, el f1 baja {num(bloques.set_index('factor_corto').loc['rendimiento', 'caida'])}, el {pct(b['rendimiento'])} de lo aprendido.
+5. Como la mezcla es al azar, se repite 10 veces y se promedia (de una mezcla a otra el número varía alrededor de
+   0,01). La temporada da un poquito negativo por azar: el modelo no la usa, y se muestra como 0 %.
+
+Se hace por factor y no por columna porque las columnas parecidas se reparten la importancia: cada una de las 23
+estadísticas pesa poco sola, porque las otras la cubren. Sacando cada factor y reentrenando (Entrega 3, sección 7.1)
+el orden es el mismo: sin las estadísticas el f1 cae 0,093, sin el club de origen 0,039. Ninguno es fuga: todos existen
+antes del fichaje y no usan el destino.
 """)
 
 # =============================================================================== COPA · EXPLORÁ
@@ -407,14 +442,20 @@ if vista.empty:
     st.info("No quedan fichajes con estos filtros.")
 else:
     panorama = tasa_por_nivel(vista, factor)
-    st.caption(f"{miles(len(vista))} fichajes con estos filtros · la línea punteada es la tasa de este universo "
+    # con pocos casos el porcentaje salta mucho (2 de 8 ya es 25 %): como en la práctica de Altair (7.3),
+    # los grupos de menos de 20 fichajes se muestran claros y con su cantidad a la vista
+    MIN_CASOS = 20
+    panorama["alfa"] = np.where(panorama["fichajes"] < MIN_CASOS, 0.3, 1.0)
+    panorama["etiqueta"] = [f"{e} ({miles(n_)})" for e, n_ in zip(panorama["etiqueta"], panorama["fichajes"])]
+    st.caption(f"{miles(len(vista))} fichajes con estos filtros · entre paréntesis, cuántos hay en cada grupo · "
+               "la línea punteada es la tasa de este universo "
                f"({pct(vista['es_destino_top_20'].mean(), 1)})")
     seleccion = alt.selection_point(name="nivel_elegido", fields=["nivel"])
-    base_e = alt.Chart(panorama).encode(x=alt.X("nivel:N", sort=list(panorama["nivel"]), title=NOMBRE_FACTOR[factor],
-                                                axis=alt.Axis(labelAngle=-30 if factor == "puesto" else 0)))
+    base_e = alt.Chart(panorama).encode(x=alt.X("etiqueta:N", sort=list(panorama["etiqueta"]), title=NOMBRE_FACTOR[factor],
+                                                axis=alt.Axis(labelAngle=0, labelOverlap=False, labelLimit=160)))
     barras_e = base_e.mark_bar(color=AZUL, cursor="pointer").encode(
         y=alt.Y("tasa:Q", title="% que va a un top 20", axis=alt.Axis(format="%")),
-        opacity=alt.condition(seleccion, alt.value(1), alt.value(0.35)),
+        opacity=alt.condition(seleccion, alt.Opacity("alfa:Q", scale=None, legend=None), alt.value(0.15)),
         tooltip=[alt.Tooltip("nivel:N"), alt.Tooltip("fichajes:Q"),
                  alt.Tooltip("tasa:Q", format=".1%", title="% que fue a un top 20"),
                  alt.Tooltip("modelo:Q", format=".1%", title="probabilidad media del modelo")]
@@ -422,12 +463,15 @@ else:
     marcas_modelo = base_e.mark_tick(color="#1d2329", thickness=3, size=40).encode(y="modelo:Q")
     tasa_vista = alt.Chart(pd.DataFrame({"t": [vista["es_destino_top_20"].mean()]})).mark_rule(
         strokeDash=[4, 3], color="#777").encode(y="t:Q")
-    evento = st.altair_chart((barras_e + marcas_modelo + tasa_vista).properties(height=320), width="stretch",
+    evento = grafico((barras_e + marcas_modelo + tasa_vista).properties(height=320), width="stretch",
                              on_select="rerun", key="explora_barras")
 
+    if (panorama["fichajes"] < MIN_CASOS).any():
+        st.caption(f"Las barras claras tienen menos de {MIN_CASOS} fichajes: con tan pocos casos el porcentaje se mueve "
+                   "mucho (2 de 8 ya es 25 %), así que no conviene sacar conclusiones de ellas.")
     elegidos = [p["nivel"] for p in evento.selection.get("nivel_elegido", []) if "nivel" in p]
     if not elegidos:
-        st.markdown("👆 Tocá una barra para ver los jugadores de ese grupo.")
+        st.caption("Tocá una barra para ver los jugadores de ese grupo.")
     else:
         grupo = vista[vista[factor].isin(elegidos)].sort_values("proba", ascending=False)
         st.markdown(f"**{miles(len(grupo))} fichajes en «{', '.join(elegidos)}»**, ordenados por la probabilidad que les "
@@ -536,14 +580,15 @@ r1.markdown(f'<div class="cifra" style="color:{AZUL if llega else GRIS}">{num(pr
             f'(umbral {num(resumen["umbral"], 2)})', unsafe_allow_html=True)
 escala_p = alt.Scale(domain=[0, 1])
 pista = alt.Chart(pd.DataFrame({"p": [1.0]})).mark_bar(color="#e6e6e6", size=34, opacity=0.35).encode(
-    x=alt.X("p:Q", scale=escala_p, axis=alt.Axis(format=".0%"),
-            title=f"probabilidad de llegar a un top 20 · la línea naranja es el umbral ({num(resumen['umbral'], 2)})"))
+    x=alt.X("p:Q", scale=escala_p, axis=alt.Axis(format=".0%"), title=None))
 barra = alt.Chart(pd.DataFrame({"p": [max(proba, 0.004)]})).mark_bar(color=AZUL if llega else GRIS, size=34).encode(
     x=alt.X("p:Q", scale=escala_p))
 linea_umbral = alt.Chart(pd.DataFrame({"p": [resumen["umbral"]]})).mark_tick(
     color=NARANJA, thickness=3, size=60).encode(x=alt.X("p:Q", scale=escala_p))
-r2.altair_chart((pista + barra + linea_umbral).properties(height=90), width="stretch")
-st.caption(f"Para comparar: el {pct(resumen['tasa_top20'], 1)} de todos los fichajes llega a un top 20. Una probabilidad "
+with r2:
+    grafico((pista + barra + linea_umbral).properties(height=110), width="stretch")
+st.caption(f"La barra es la probabilidad; la línea naranja, el umbral ({num(resumen['umbral'], 2)}): desde ahí el modelo "
+           f"dice «llega». Para comparar: el {pct(resumen['tasa_top20'], 1)} de todos los fichajes llega a un top 20. Una probabilidad "
            "de 0,25 ya es dos veces y media la tasa general.")
 
 # =============================================================================== CIERRE

@@ -72,12 +72,12 @@ contraseña `admin`.
    varios miles de consultas a FotMob: **calculá un par de horas la primera
    vez**. Las siguientes reusan el bronce.
 
-> ⚠️ **Despausar el DAG dispara una corrida enseguida, con los parámetros por
+> **Atención: despausar el DAG dispara una corrida enseguida, con los parámetros por
 > defecto** — o sea los 200 clubes y las 5 temporadas, no lo que hayas elegido
 > en el formulario. Despausalo cuando estés listo para esa corrida larga, no
 > antes.
 
-> ⚠️ **La capa bronce vieja del Drive ya no sirve** y no se puede convertir: no
+> **Atención: la capa bronce vieja del Drive ya no sirve** y no se puede convertir: no
 > contiene el HTML de Transfermarkt, así que de ahí no salen ni la liga del club
 > de origen, ni el id del club, ni la edad real al fichaje. Hay que regenerarla.
 > Ver la sección 4 del documento de explicación.
