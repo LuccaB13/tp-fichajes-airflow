@@ -107,18 +107,27 @@ st.write(
     "Cada temporada, miles de jugadores cambian de club. Unos pocos terminan en uno de los 20 clubes con mejor "
     "coeficiente UEFA. ¿Qué tienen en común? Miramos lo que se sabe **antes** del fichaje —cómo jugó la temporada "
     "anterior, de qué club viene, su edad y su puesto— y cuánto pesa cada cosa.")
+def uno_de_cada(tasa):
+    """0,194 → «1 de cada 5»; si la tasa queda bastante arriba de 1/N, «más de 1 de cada N»."""
+    n = max(1, round(1 / tasa))
+    if n > 10:                                   # de 10 para arriba, a la decena o media decena: 1 de cada 20
+        n = 5 * round(n / 5)
+    return ("más de " if tasa > 1 / n * 1.05 else "") + f"1 de cada {n}"
+
+
+h5_portada = pd.DataFrame(resumen["h5"])
+tasa_mejores = h5_portada.query("origen == 'alto' and rendimiento == 'alto'")["tasa"].iloc[0]
 st.markdown(
-    '<div class="idea">Lo que más acerca a un jugador a un top 20 es cómo rindió comparado con su puesto y de qué club '
-    'viene; ser muy joven suma, y el puesto casi no importa.</div>', unsafe_allow_html=True)
+    '<div class="idea">Llegan a un top 20, sobre todo, los que rindieron bien para su puesto y vienen de un club '
+    'fuerte de Europa.</div>', unsafe_allow_html=True)
 c1, c2, c3 = st.columns(3)
-c1.markdown(f'<div class="cifra">×{rend["alto"] / rend["bajo"]:.0f}</div>'
-            f'llegan a un top 20 los que más rindieron para su puesto ({pct(rend["alto"], 1)}) contra los que menos '
-            f'({pct(rend["bajo"], 1)})', unsafe_allow_html=True)
-c2.markdown(f'<div class="cifra">×{num(liga["liga top 5"] / liga["otra liga"], 1)}</div>'
-            f'si viene de una liga top 5 ({pct(liga["liga top 5"], 1)}) que si viene de otra ({pct(liga["otra liga"], 1)})',
-            unsafe_allow_html=True)
-c3.markdown(f'<div class="cifra">×{tasa_joven / tasa_resto:.0f}</div>'
-            f'si ficha con 19 años o menos ({pct(tasa_joven, 1)}) que si es mayor ({pct(tasa_resto, 1)})',
+c1.markdown(f'<div class="cifra">{uno_de_cada(resumen["tasa_top20"])}</div>'
+            'fichajes termina en un club top 20 de UEFA.', unsafe_allow_html=True)
+c2.markdown(f'<div class="cifra">{uno_de_cada(liga["liga top 5"])}</div>'
+            'si el jugador viene de una liga top 5 (Premier, LaLiga, Serie A, Bundesliga o Ligue 1). '
+            f'Desde las demás ligas, {uno_de_cada(liga["otra liga"])}.', unsafe_allow_html=True)
+c3.markdown(f'<div class="cifra">{uno_de_cada(tasa_mejores).capitalize()}</div>'
+            'si viene de un club fuerte de Europa y además fue de los que mejor rindieron para su puesto.',
             unsafe_allow_html=True)
 st.caption(f"Medido sobre {miles(resumen['n_ana'])} fichajes de {miles(resumen['n_jugadores'])} jugadores, cinco "
            f"temporadas (2022/23 a 2026/27). Un random forest que predice el destino con estos datos (f1 macro "
