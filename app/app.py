@@ -17,6 +17,7 @@ import streamlit as st
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 import modelo as m  # noqa: E402  (pickle necesita ZPorRol y a_numero de este módulo)
+import portada  # noqa: E402
 
 DATOS = os.path.join(AQUI, "datos")
 alt.data_transformers.disable_max_rows()
@@ -26,6 +27,8 @@ alt.data_transformers.disable_max_rows()
 #   celeste   = fue a un top 20 y el modelo no lo vio
 #   naranja   = el modelo dijo top 20 y no fue
 #   gris      = no fue a un top 20
+# El verde (#2e8540) es sólo de la interfaz: la portada, las cifras grandes y los controles. No se usa en los
+# gráficos, porque el verde se lee como «correcto» y los datos no son ni buenos ni malos.
 AZUL, CELESTE, NARANJA, GRIS = "#2a78d6", "#9cc3ef", "#d95926", "#b5b4ae"
 
 NOMBRES_STATS = {
@@ -41,7 +44,8 @@ NOMBRES_STATS = {
     "stat_high_claims": "Salidas por arriba",
 }
 
-st.set_page_config(page_title="¿Qué lleva a un jugador a un top 20?", layout="wide")
+st.set_page_config(page_title="¿Qué lleva a un jugador a un top 20?", page_icon=":material/sports_soccer:",
+                   layout="wide")
 
 
 def grafico(chart, **kw):
@@ -86,8 +90,8 @@ fp_cerca = resumen["fp_destino"]["puesto 21 a 50"] + resumen["fp_destino"]["pues
 st.markdown("""
 <style>
 .etiqueta {font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: #6b6b6b; margin-top: 2.2rem;}
-.cifra {font-size: 2.6rem; font-weight: 700; color: #2a78d6; line-height: 1.1;}
-.idea {font-size: 1.35rem; font-weight: 600; border-left: 4px solid #2a78d6; padding-left: 0.8rem; margin: 1rem 0;}
+.cifra {font-size: 2.6rem; font-weight: 700; color: #2e8540; line-height: 1.1;}
+.idea {font-size: 1.35rem; font-weight: 600; border-left: 4px solid #2e8540; padding-left: 0.8rem; margin: 1rem 0;}
 </style>""", unsafe_allow_html=True)
 
 # =============================================================================== PORTADA
@@ -114,8 +118,10 @@ liga = tasa_por_nivel(fichajes, "liga de origen").set_index("nivel")["tasa"]
 joven = fichajes["edad al fichar"].eq("≤19")
 tasa_joven, tasa_resto = fichajes.loc[joven, "es_destino_top_20"].mean(), fichajes.loc[~joven, "es_destino_top_20"].mean()
 
-st.markdown('<div class="etiqueta">El proyecto</div>', unsafe_allow_html=True)
-st.title("¿Qué factores hacen que un jugador llegue a un club top 20 de Europa?")
+st.markdown(portada.html(
+    "¿Qué factores hacen que un jugador llegue a un club top 20 de Europa?",
+    f"<b>{miles(resumen['n_ana'])}</b> fichajes de <b>{miles(resumen['n_jugadores'])}</b> jugadores, cinco temporadas "
+    "(2022/23 a 2026/27): cómo rindieron, de dónde venían y qué edad tenían."), unsafe_allow_html=True)
 st.write(
     "Cada temporada, miles de jugadores cambian de club. Unos pocos terminan en uno de los 20 clubes con mejor "
     "coeficiente UEFA. ¿Qué tienen en común? Miramos lo que se sabe **antes** del fichaje —cómo jugó la temporada "
