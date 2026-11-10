@@ -547,6 +547,32 @@ st.caption(f"{club_p}: {club['club_origen_liga']} · "
 
 r = rangos_rol[puesto_p]
 propias = [s for s in m.BASE + m.ESPECIFICAS[puesto_p] if s in r.index]
+NIVELES_Q = [f"q{k}" for k in range(101)]
+PLURAL = {"Arquero": "arqueros", "Defensor central": "defensores centrales", "Lateral": "laterales",
+          "Mediocampo defensivo": "mediocampistas defensivos", "Mediocampo ofensivo": "mediocampistas ofensivos",
+          "Delantero centro": "delanteros centro", "Delantero extremo": "delanteros extremos"}
+
+
+def aplicar_nivel(percentil):
+    """Pone las 7 stats del puesto en un percentil del entrenamiento; las demás vuelven al promedio del puesto."""
+    rr = rangos_rol[st.session_state["p_puesto"]]
+    for s_ in m.BASE + m.ESPECIFICAS[st.session_state["p_puesto"]]:
+        if s_ in rr.index:
+            lo_, hi_ = float(rr.loc[s_, "min"]), float(rr.loc[s_, "max"])
+            paso_ = 1.0 if hi_ - lo_ > 50 else 0.1 if hi_ - lo_ > 5 else 0.01
+            st.session_state[f"p_{s_}"] = round(float(rr.loc[s_, f"q{percentil}"]) / paso_) * paso_
+    st.session_state["p_resto"] = None
+    st.session_state["partir_de"] = None
+
+
+st.markdown("**Atajos:** cargá las 7 estadísticas del puesto de una vez, y después ajustá lo que quieras.")
+a1, a2, a3, _ = st.columns([1, 1, 1, 1.5])
+a1.button("Promedio del puesto", on_click=aplicar_nivel, args=(50,), help="La mitad de los jugadores del puesto "
+          "tiene más y la mitad menos", width="stretch")
+a2.button("Bueno", on_click=aplicar_nivel, args=(75,), help="Mejor que 3 de cada 4 jugadores del puesto",
+          width="stretch")
+a3.button("Muy bueno", on_click=aplicar_nivel, args=(90,), help="Mejor que 9 de cada 10 jugadores del puesto",
+          width="stretch")
 resto = st.session_state.get("p_resto")
 st.markdown(f"**Estadísticas de la temporada anterior** (las 7 propias de un {puesto_p.lower()}; las demás "
             + ("quedan como las tenía el jugador elegido)" if resto and resto["puesto"] == puesto_p
@@ -558,7 +584,12 @@ for j, s in enumerate(propias):
     if f"p_{s}" not in st.session_state or not (lo <= st.session_state[f"p_{s}"] <= hi):
         st.session_state[f"p_{s}"] = med
     paso = 1.0 if hi - lo > 50 else 0.1 if hi - lo > 5 else 0.01
-    valores[s] = cols[j % 4].slider(NOMBRES_STATS.get(s, s), lo, hi, step=paso, key=f"p_{s}")
+    formato = "%.0f" if paso == 1.0 else "%.1f" if paso == 0.1 else "%.2f"
+    valores[s] = cols[j % 4].slider(NOMBRES_STATS.get(s, s), lo, hi, step=paso, key=f"p_{s}", format=formato)
+    cuantiles = r.loc[s, NIVELES_Q].to_numpy(dtype=float)
+    supera = float(np.interp(valores[s], cuantiles, np.arange(101)))
+    cols[j % 4].caption(f"más que el {supera:.0f} % de los {PLURAL[puesto_p]} · típico: "
+                        f"{num(r.loc[s, 'mediana'], 0 if paso == 1.0 else 1)}")
 
 caso = {c: np.nan for c in m.COLUMNAS_MODELO}
 resto = st.session_state.get("p_resto")

@@ -7,7 +7,7 @@ Entrena el modelo elegido en la Entrega 3 con la misma semilla y deja en app/dat
     modelo.joblib       el pipeline entrenado (preparar + random forest)
     fichajes_app.csv    cada fichaje con lo que dijo el modelo (para «Explorá»)
     clubes.csv          los clubes de origen conocidos (para «Probá el modelo»)
-    rangos.csv          mínimo, mediana y máximo de cada stat por rol en el entrenamiento
+    rangos.csv          mínimo, mediana, máximo y percentiles de cada stat por rol en el entrenamiento
     resumen.json        los números y tablas de la portada y del tallo
 
 Si el pipeline actualiza los datos, correr esto de nuevo actualiza la aplicación.
@@ -209,7 +209,10 @@ def main():
         for c in m.STATS:
             v = pd.to_numeric(sub[c], errors="coerce").dropna()
             if len(v):
-                filas_rango.append({"rol": rol, "stat": c, "min": v.min(), "mediana": v.median(), "max": v.max()})
+                # los percentiles 0 a 100: para decir «más que el X % de su puesto» y armar los atajos de la app
+                q = np.percentile(v, np.arange(101))
+                filas_rango.append({"rol": rol, "stat": c, "min": v.min(), "mediana": v.median(), "max": v.max(),
+                                    **{f"q{k}": q[k] for k in range(101)}})
     pd.DataFrame(filas_rango).to_csv(os.path.join(salida, "rangos.csv"), index=False)
 
     f1_test = f1_score(y_test, pred_test, average="macro")
