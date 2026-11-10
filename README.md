@@ -1,5 +1,7 @@
 # Pipeline de fichajes — Ciencia de Datos, UTN FRM 2026
 
+> **La aplicación:** <https://fichajes-grupo7.streamlit.app/>
+>
 > **Proyecto integrador completo:** el pipeline (este README, más abajo), el análisis y el modelo
 > (`analisis/`) y la aplicación web (`app/`). La sección [La aplicación](#la-aplicación-entrega-4)
 > explica cómo se regenera todo desde los datos.
@@ -131,7 +133,8 @@ nuevo.
 | `analisis/` | los notebooks de la Entrega 2 (análisis exploratorio, seis hipótesis) y de la Entrega 3 (modelado) |
 | `app/modelo.py` | el modelo de la Entrega 3, tal cual el notebook: población, columnas, `ZPorRol`, pipeline y partición |
 | `app/build_app.py` | entrena el modelo con la misma semilla y genera todo lo que usa la aplicación |
-| `app/app.py` | la aplicación de Streamlit (gráficos con Altair) |
+| `app/app.py` | la aplicación de Streamlit (gráficos con Altair), publicada en <https://fichajes-grupo7.streamlit.app/> |
+| `app/portada.py`, `app/imagenes/` | la portada: la cancha y la pelota dibujadas en SVG, y la foto |
 | `app/datos/` | lo que genera `build_app.py`: el modelo entrenado, los fichajes con su predicción y los números |
 
 ### De los datos a la aplicación
