@@ -349,13 +349,14 @@ modelo usa su mejor umbral.
     st.table(tabla.set_index("familia"))
     puntos = alt.Chart(comp).mark_point(filled=True, size=90, color=AZUL).encode(
         x=alt.X("f1:Q", scale=alt.Scale(domain=[0.46, 0.72]), title="f1 macro (media ± desvío)"),
-        y=alt.Y("familia:N", sort=list(comp.sort_values("f1", ascending=False)["familia"]), title=None))
+        y=alt.Y("familia:N", sort=list(comp.sort_values("f1", ascending=False)["familia"]), title=None,
+                axis=alt.Axis(labelOverlap=False, labelLimit=200)))
     errores = alt.Chart(comp).mark_errorbar(color=AZUL).encode(
         x=alt.X("min:Q", scale=alt.Scale(domain=[0.46, 0.72]), title="f1 macro (media ± desvío)"), x2="max:Q",
         y=alt.Y("familia:N", sort=list(comp.sort_values("f1", ascending=False)["familia"]))
     ).transform_calculate(min="datum.f1 - datum.desvio", max="datum.f1 + datum.desvio")
     linea_piso = alt.Chart(pd.DataFrame({"piso": [piso]})).mark_rule(strokeDash=[4, 3], color="#777").encode(x="piso:Q")
-    grafico((errores + puntos + linea_piso).properties(height=170, title="Eje recortado de 0,46 a 0,72; "
+    grafico((errores + puntos + linea_piso).properties(height=260, title="Eje recortado de 0,46 a 0,72; "
                     "la línea punteada es el piso"), width="stretch")
     rf = comp.set_index("familia").loc["random forest"]
     rl = comp.set_index("familia").loc["regresión logística"]
