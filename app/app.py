@@ -371,13 +371,13 @@ Roma, Benfica): compran jugadores sin perfil de top 20.
     clubes_test = pd.DataFrame(resumen["clubes_test"]).head(12)
     largo_c = clubes_test.melt(id_vars="club", value_vars=["encontrados", "perdidos"], var_name="qué pasó",
                                value_name="fichajes")
-    largo_c["qué pasó"] = largo_c["qué pasó"].replace({"encontrados": "el modelo lo encontró",
-                                                       "perdidos": "se le escapó"})
+    largo_c["qué pasó"] = largo_c["qué pasó"].replace({"encontrados": "lo encontró (verdadero positivo)",
+                                                       "perdidos": "se le escapó (falso negativo)"})
     grafico(alt.Chart(largo_c).mark_bar().encode(
         y=alt.Y("club:N", sort=list(clubes_test["club"]), title=None, axis=alt.Axis(labelLimit=220, labelOverlap=False)),
         x=alt.X("fichajes:Q", title="fichajes del test que llegaron a ese club top 20", stack="zero"),
-        color=alt.Color("qué pasó:N", scale=alt.Scale(domain=["el modelo lo encontró", "se le escapó"],
-                                                     range=[AZUL, CELESTE]), legend=alt.Legend(title=None, orient="top")),
+        color=alt.Color("qué pasó:N", scale=alt.Scale(domain=["lo encontró (verdadero positivo)", "se le escapó (falso negativo)"],
+                                                     range=[AZUL, CELESTE]), legend=alt.Legend(title=None, orient="top", labelLimit=320)),
         order=alt.Order("qué pasó:N"), tooltip=["club", "qué pasó", "fichajes"]).properties(height=330), width="stretch")
     st.markdown("Los que señala de más tienen perfil de top 20 y terminan **justo debajo**. "
                 "**De los que no llegaron a un top 20, ¿a qué puesto UEFA fue su club?** (cada grupo suma 100 %)")
@@ -469,19 +469,27 @@ else:
     marcas_modelo = base_e.mark_tick(color="#1d2329", thickness=3, size=40).encode(y="modelo:Q")
     tasa_vista = alt.Chart(pd.DataFrame({"t": [vista["es_destino_top_20"].mean()]})).mark_rule(
         strokeDash=[4, 3], color="#777").encode(y="t:Q")
+    # la clave cambia con el factor (la barra elegida de otro factor no existe en éste) y con «Cerrar la lista»:
+    # una clave nueva es un gráfico nuevo, sin ninguna barra elegida
+    st.session_state.setdefault("explora_cierres", 0)
     evento = grafico((barras_e + marcas_modelo + tasa_vista).properties(height=320), width="stretch",
-                             on_select="rerun", key="explora_barras")
+                     on_select="rerun", key=f"explora_barras_{factor}_{st.session_state['explora_cierres']}")
 
     if (panorama["fichajes"] < MIN_CASOS).any():
         st.caption(f"Las barras claras tienen menos de {MIN_CASOS} fichajes: con tan pocos casos el porcentaje se mueve "
                    "mucho (2 de 8 ya es 25 %), así que no conviene sacar conclusiones de ellas.")
-    elegidos = [p["nivel"] for p in evento.selection.get("nivel_elegido", []) if "nivel" in p]
+    niveles_vistos = set(panorama["nivel"])
+    elegidos = [p["nivel"] for p in evento.selection.get("nivel_elegido", [])
+                if "nivel" in p and p["nivel"] in niveles_vistos]
     if not elegidos:
         st.caption("Tocá una barra para ver los jugadores de ese grupo.")
     else:
         grupo = vista[vista[factor].isin(elegidos)].sort_values("proba", ascending=False)
-        st.markdown(f"**{miles(len(grupo))} fichajes en «{', '.join(elegidos)}»**, ordenados por la probabilidad que les "
-                    f"dio el modelo. {int(grupo['es_destino_top_20'].sum())} fueron a un top 20.")
+        texto_c, boton_c = st.columns([5, 1], vertical_alignment="center")
+        texto_c.markdown(f"**{miles(len(grupo))} fichajes en «{', '.join(elegidos)}»**, ordenados por la probabilidad que "
+                         f"les dio el modelo. {int(grupo['es_destino_top_20'].sum())} fueron a un top 20.")
+        boton_c.button("Cerrar la lista", icon=":material/close:",
+                       on_click=lambda: st.session_state.update(explora_cierres=st.session_state["explora_cierres"] + 1))
         detalle = grupo.assign(destino=grupo["club_destino"] + " (puesto " + grupo["club_destino_ranking_uefa"].astype(str)
                                        + ")")[["nombre", "temporada_fichaje", "grupo_posicion", "edad_al_fichaje",
                                                "club_origen", "destino", "proba", "resultado"]]

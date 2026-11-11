@@ -137,8 +137,9 @@ def main():
     real = ana["es_destino_top_20"].astype(bool)
     ana["resultado"] = np.select(
         [real & ana["dice_top20"], real & ~ana["dice_top20"], ~real & ana["dice_top20"]],
-        ["acierto: llegó y lo señaló", "se le escapó: llegó y no lo señaló", "falso positivo: lo señaló y no llegó"],
-        "negativo: no llegó y no lo señaló")
+        ["verdadero positivo: llegó y lo señaló", "falso negativo: llegó y no lo señaló",
+         "falso positivo: lo señaló y no llegó"],
+        "verdadero negativo: no llegó y no lo señaló")
 
     # errores del test
     test = ana.loc[idx_test]
