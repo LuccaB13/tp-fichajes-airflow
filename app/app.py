@@ -54,13 +54,18 @@ def grafico(chart, **kw):
 
 
 
+def version_datos():
+    """Cambia cuando cambia un archivo de app/datos: así la caché no sigue sirviendo datos viejos después de un push."""
+    return tuple(sorted((f, os.path.getmtime(os.path.join(DATOS, f))) for f in os.listdir(DATOS)))
+
+
 @st.cache_resource
-def cargar_modelo():
+def cargar_modelo(version):
     return joblib.load(os.path.join(DATOS, "modelo.joblib"))
 
 
 @st.cache_data
-def cargar_datos():
+def cargar_datos(version):
     with open(os.path.join(DATOS, "resumen.json"), encoding="utf-8") as f:
         resumen = json.load(f)
     fichajes = pd.read_csv(os.path.join(DATOS, "fichajes_app.csv"))
@@ -82,8 +87,8 @@ def miles(x):
     return f"{int(x):,}".replace(",", ".")
 
 
-resumen, fichajes, columnas_modelo, clubes, rangos = cargar_datos()
-final = cargar_modelo()
+resumen, fichajes, columnas_modelo, clubes, rangos = cargar_datos(version_datos())
+final = cargar_modelo(version_datos())
 t = resumen["test"]
 fp_cerca = resumen["fp_destino"]["puesto 21 a 50"] + resumen["fp_destino"]["puesto 51 a 100"]
 
