@@ -134,7 +134,7 @@ nuevo.
 | `app/modelo.py` | el modelo de la Entrega 3, tal cual el notebook: población, columnas, `ZPorRol`, pipeline y partición |
 | `app/build_app.py` | entrena el modelo con la misma semilla y genera todo lo que usa la aplicación |
 | `app/app.py` | la aplicación de Streamlit (gráficos con Altair), publicada en <https://fichajes-grupo7.streamlit.app/> |
-| `app/portada.py`, `app/imagenes/` | la portada: la cancha y la pelota dibujadas en SVG, y la foto |
+| `app/portada.py`, `app/imagenes/` | la portada: la cancha y la pelota dibujadas en SVG, y la foto; en `imagenes/jugadores/`, las fotos de los casos de errores del modelo (de Wikimedia Commons, con su crédito en la app) |
 | `app/datos/` | lo que genera `build_app.py`: el modelo entrenado, los fichajes con su predicción y los números |
 
 ### De los datos a la aplicación

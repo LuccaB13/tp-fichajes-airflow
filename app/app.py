@@ -4,6 +4,8 @@
 
 Lee lo que deja app/build_app.py en app/datos/. No entrena nada: carga el modelo guardado.
 """
+import base64
+import functools
 import json
 import os
 import sys
@@ -96,6 +98,19 @@ st.markdown("""
 <style>
 .etiqueta {font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: #6b6b6b; margin-top: 2.2rem;}
 .cifra {font-size: 2.6rem; font-weight: 700; color: #2e8540; line-height: 1.1;}
+.tipo-error {font-size: 1.12rem; font-weight: 700; border-left: 4px solid #d95926; padding-left: 0.6rem;
+             margin: 1.8rem 0 0.4rem 0;}
+.tipo-error-fn {font-size: 1.12rem; font-weight: 700; border-left: 4px solid #9cc3ef; padding-left: 0.6rem;
+                margin: 1.8rem 0 0.4rem 0;}
+.carrusel {display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 14px 2px;}
+.tarjeta {flex: 0 0 270px; scroll-snap-align: start; border: 1px solid #e1e4e1; border-radius: 10px; background: #fff;
+          overflow: hidden;}
+.tarjeta img {width: 100%; height: 300px; object-fit: cover; object-position: 50% 0%; display: block;}
+.tarjeta .cuerpo {padding: 10px 12px 12px 12px; font-size: 0.86rem; line-height: 1.4; color: #222;}
+.tarjeta .nombre {font-size: 1.02rem; font-weight: 700; margin-bottom: 2px;}
+.tarjeta .dato {color: #555; margin-bottom: 6px;}
+.tarjeta .modelo {background: #eef4fb; border-radius: 6px; padding: 4px 8px; margin: 6px 0; font-size: 0.82rem;}
+.tarjeta .credito {font-size: 0.7rem; color: #888; margin-top: 8px;}
 .idea {font-size: 1.35rem; font-weight: 600; border-left: 4px solid #2e8540; padding-left: 0.8rem; margin: 1rem 0;}
 </style>""", unsafe_allow_html=True)
 
@@ -146,7 +161,7 @@ st.markdown(
     'fuerte de Europa.</div>', unsafe_allow_html=True)
 c1, c2, c3 = st.columns(3)
 c1.markdown(f'<div class="cifra">{uno_de_cada(resumen["tasa_top20"])}</div>'
-            'fichajes termina en un club top 20 de UEFA.', unsafe_allow_html=True)
+            'de todos los fichajes termina en un club top 20 de UEFA.', unsafe_allow_html=True)
 c2.markdown(f'<div class="cifra">{uno_de_cada(liga["liga top 5"])}</div>'
             'si el jugador viene de una liga top 5 (Premier, LaLiga, Serie A, Bundesliga o Ligue 1). '
             f'Desde las demás ligas, {uno_de_cada(liga["otra liga"])}.', unsafe_allow_html=True)
@@ -176,12 +191,12 @@ barras = alt.Chart(largo).mark_bar().encode(
     tooltip=["temporada_fichaje", "destino", "cantidad"])
 textos = alt.Chart(temporadas).mark_text(align="left", dx=4, color="#333").encode(
     y="temporada_fichaje:N", x=alt.X("fichajes:Q"), text=alt.Text("tasa:Q", format=".0%"))
-grafico((barras + textos).properties(height=230), width="stretch")
 st.write(
-    f"Cada barra es una temporada de fichajes; la parte azul, los que fueron a un top 20. El número a la derecha es "
-    f"la proporción: entre 9 % y 11 % todos los años ({pct(resumen['tasa_top20'], 1)} en total). Por eso la "
-    "precisión se mide con cuidado: un modelo que dijera siempre «no llega» acertaría 9 de cada 10 veces sin "
-    "encontrar a nadie.")
+    "Cada barra es una temporada de fichajes: la parte azul son los que fueron a un club top 20 y la gris, el resto. "
+    f"El número a la derecha es la proporción que llegó, y casi no cambia: entre 9 % y 11 % todos los años "
+    f"({pct(resumen['tasa_top20'], 1)} en total). Por eso el modelo se mide con cuidado: uno que dijera siempre «no "
+    "llega» acertaría 9 de cada 10 veces sin encontrar a nadie.")
+grafico((barras + textos).properties(height=230), width="stretch")
 
 with st.expander("Cómo lo sabemos"):
     st.markdown(f"""
@@ -225,6 +240,13 @@ TITULOS_PANEL = {"rendimiento comparado con su puesto": "Rendimiento para su pue
 ESCALA_TASA = alt.Scale(domain=[0, 0.25])
 referencia = alt.Chart(pd.DataFrame({"tasa": [resumen["tasa_top20"]]})).mark_rule(
     strokeDash=[4, 3], color="#777").encode(y=alt.Y("tasa:Q", scale=ESCALA_TASA))
+st.write(
+    "Cada panel es un factor y cada barra, un nivel de ese factor: su altura es el % de esos fichajes que terminó en "
+    "un club top 20. Los cuatro paneles tienen **la misma escala**, y la línea punteada es la tasa de todos los "
+    f"fichajes ({pct(resumen['tasa_top20'], 1)}): una barra arriba de la línea llega más que el promedio. En los tres "
+    "primeros, la barra de la derecha está muy por encima de la de la izquierda: rendir más que los de su puesto, "
+    "venir de un club fuerte en UEFA y llegar muy joven multiplican las chances. En el último, todas las barras quedan "
+    "pegadas a la línea: el puesto no cambia casi nada.")
 paneles = []
 for k, factor in enumerate(FACTORES_TALLO):
     tabla = tasa_por_nivel(fichajes, factor)
@@ -241,15 +263,30 @@ for k, factor in enumerate(FACTORES_TALLO):
     paneles.append((barras_p + textos_p + referencia).properties(width={"puesto": 300, "nivel UEFA del club de origen": 210}.get(factor, 170), height=240,
                                                                 title=TITULOS_PANEL[factor]))
 grafico(alt.hconcat(*paneles).resolve_scale(y="shared"), width="content")
-st.write(
-    f"Cada panel es un factor, con **la misma escala**; la línea punteada es la tasa general "
-    f"({pct(resumen['tasa_top20'], 1)}). En los tres primeros la barra de la derecha está muy por encima de la de la "
-    "izquierda: rendir más que los de su puesto, venir de un club fuerte en UEFA y llegar muy joven multiplican las "
-    "chances. En el último, todas las barras quedan pegadas a la línea: el puesto no cambia casi nada.")
 
 h5 = pd.DataFrame(resumen["h5"])
 alto_alto = h5.query("origen == 'alto' and rendimiento == 'alto'")["tasa"].iloc[0]
 bajo_alto = h5.query("origen == 'bajo' and rendimiento == 'alto'")["tasa"].iloc[0]
+st.write(
+    "**El rendimiento y el club de origen suman por separado.** Este mapa cruza los dos: las columnas son el "
+    "rendimiento para su puesto y las filas, el nivel UEFA del club de origen, en tercios cada uno. Cada casilla es el "
+    "% de esos fichajes que llegó a un top 20: cuanto más oscura, más alto. Con el mismo rendimiento alto, venir de un "
+    f"club de nivel bajo da {pct(bajo_alto, 1)} y de uno alto, {pct(alto_alto, 1)}: el club de origen agrega algo que "
+    "el rendimiento no dice. La esquina de arriba a la derecha —club fuerte y temporada de alto rendimiento— es el "
+    "«más de 1 de cada 3» de la portada.")
+orden = ["bajo", "medio", "alto"]
+base_h5 = alt.Chart(h5).encode(
+    x=alt.X("rendimiento:O", sort=orden, title="rendimiento para su puesto", axis=alt.Axis(labelAngle=0)),
+    y=alt.Y("origen:O", sort=orden[::-1], title="club de origen", axis=alt.Axis(titlePadding=10)))
+grafico((base_h5.mark_rect().encode(
+    color=alt.Color("tasa:Q", scale=alt.Scale(scheme="blues", domain=[0, 0.4]),
+                    legend=alt.Legend(title="% top 20", format=".0%")),
+    tooltip=[alt.Tooltip("tasa:Q", format=".1%", title="% top 20"), alt.Tooltip("n:Q", title="fichajes")])
+    + base_h5.mark_text(fontSize=14).encode(text=alt.Text("tasa:Q", format=".1%"),
+                                            color=alt.condition(alt.datum.tasa > 0.2, alt.value("white"),
+                                                                alt.value("#222"))))
+    .properties(height=240, width=460), width="content")
+
 with st.expander("Cómo lo sabemos"):
     st.markdown("""
 **Hipótesis que se sostuvieron** (Entrega 2, separación estandarizada entre los que van a un top 20 y el resto):
@@ -262,22 +299,8 @@ with st.expander("Cómo lo sabemos"):
 **Una que no se sostuvo (Hipótesis 2, altura):** separación **0,044**, rojo: 0,3 cm de diferencia. La altura no entró al
 modelo.
 
-**Los dos primeros factores suman por separado.** Cruzando club de origen y rendimiento (tercios de cada uno), con el
-mismo rendimiento alto, venir de un club de nivel bajo da""" + f""" {pct(bajo_alto, 1)} y de uno alto {pct(alto_alto, 1)}:""")
-    orden = ["bajo", "medio", "alto"]
-    base_h5 = alt.Chart(h5).encode(
-        x=alt.X("rendimiento:O", sort=orden, title="rendimiento para su puesto", axis=alt.Axis(labelAngle=0)),
-        y=alt.Y("origen:O", sort=orden[::-1], title="club de origen", axis=alt.Axis(titlePadding=10)))
-    grafico((base_h5.mark_rect().encode(
-        color=alt.Color("tasa:Q", scale=alt.Scale(scheme="blues", domain=[0, 0.4]),
-                        legend=alt.Legend(title="% top 20", format=".0%")),
-        tooltip=[alt.Tooltip("tasa:Q", format=".1%", title="% top 20"), alt.Tooltip("n:Q", title="fichajes")])
-        + base_h5.mark_text(fontSize=14).encode(text=alt.Text("tasa:Q", format=".1%"),
-                                                color=alt.condition(alt.datum.tasa > 0.2, alt.value("white"),
-                                                                    alt.value("#222"))))
-        .properties(height=240, width=460), width="content")
-    st.markdown("""
-**Cómo se construyó el gráfico principal.** Cada barra es el % de los fichajes de ese nivel que fue a un top 20.
+**Cómo se construyeron los gráficos.** Cada barra (y cada casilla del mapa) es el % de los fichajes de ese nivel que fue
+a un top 20: son datos reales, no predicciones del modelo.
 - **Rendimiento:** el puntaje de la Entrega 2, el promedio de las 7 estadísticas propias del puesto (minutos, partidos y
   5 del rol), cada una pasada a z **dentro de su puesto**, así un central se compara con centrales. Cortado en tercios
   con la misma cantidad de fichajes.
@@ -300,6 +323,23 @@ b = bloques.set_index("factor_corto")["pierde"]
 st.markdown('<div class="etiqueta">El modelo</div>', unsafe_allow_html=True)
 st.header(f"El modelo confirma el orden: sin el rendimiento pierde más de la mitad de lo que aprendió, y sin el club "
           f"de origen más de un tercio")
+st.write(
+    "**Hicimos un modelo de predicción.** Con lo que se sabe de un fichaje **antes** de que ocurra —cómo jugó el "
+    "jugador la temporada anterior comparado con los de su puesto, de qué club y de qué liga viene, su edad, su puesto "
+    "y la temporada— un **random forest** (300 árboles de decisión que votan) calcula la probabilidad de que el fichaje "
+    "termine en un club top 20. Lo entrenamos con el 80 % de los fichajes y lo medimos una sola vez con el 20 % "
+    f"restante, que nunca vio: saca un f1 macro de **{num(t['f1'])}**, contra {num(resumen['piso']['media'])} de un "
+    "modelo que dijera siempre «no llega». De cada 5 jugadores que señala, 2 llegan, cuando la tasa general es 1 de "
+    "cada 10.")
+st.write(
+    "**En qué se apoya.** Para saber qué factores usa, le sacamos uno por vez —mezclando esa información entre los "
+    "jugadores, para que no la pueda usar— y medimos cuánto empeora. Cada barra es la parte de lo que había aprendido "
+    "(lo que saca por encima del modelo que dice siempre «no») que se pierde sin ese factor: cuanto más larga, más "
+    f"depende de él. Sin el rendimiento pierde el {pct(b['rendimiento'])}, y sin el club de origen el "
+    f"{pct(b['club de origen'])}; el puesto y la edad suman poco, y la temporada nada. Es el mismo orden que mostraban "
+    "los datos solos: el modelo no encontró un factor escondido, confirmó los que ya se veían y midió cuánto pesa cada "
+    "uno. Los porcentajes no suman 100 % porque los factores se superponen en parte (los jugadores de clubes fuertes "
+    "también suelen rendir más).")
 orden_b = list(bloques.sort_values("pierde", ascending=False)["factor_corto"])
 base_b = alt.Chart(bloques).encode(y=alt.Y("factor_corto:N", sort=orden_b, title=None, axis=alt.Axis(labelLimit=220)))
 barras_b = base_b.mark_bar(color=AZUL).encode(
@@ -309,21 +349,604 @@ barras_b = base_b.mark_bar(color=AZUL).encode(
 textos_b = base_b.mark_text(align="left", dx=5, fontSize=13, color="#1d2329").encode(
     x=alt.X("pierde:Q", scale=alt.Scale(domain=[0, 0.7])), text="rotulo:N")
 grafico((barras_b + textos_b).properties(height=210), width="stretch")
+
+comp = pd.DataFrame(resumen["comparacion"])
+piso = resumen["piso"]["media"]
+rf = comp.set_index("familia").loc["random forest"]
+rl = comp.set_index("familia").loc["regresión logística"]
+gb = comp.set_index("familia").loc["gradient boosting"]
 st.write(
-    "Entrenamos un random forest que predice si el fichaje va a un top 20, con todos los factores juntos. Después le "
-    "sacamos un factor por vez —mezclando esa información entre los jugadores, para que no la pueda usar— y medimos "
-    f"cuánto empeora. Sin el rendimiento pierde el {pct(b['rendimiento'])} de lo que había aprendido, y sin el club de "
-    f"origen el {pct(b['club de origen'])}; el puesto y la edad suman poco, y la temporada nada. Es el mismo orden que "
-    "mostraban los datos solos: el modelo no encontró un factor escondido, confirmó los que ya se veían y midió cuánto "
-    "pesa cada uno. Los porcentajes no suman 100 % porque los factores se superponen en parte (los jugadores de clubes "
-    "fuertes también suelen rendir más).")
+    "**Por qué un random forest.** Probamos cuatro familias de modelos, cada una con su mejor combinación de "
+    "hiperparámetros. El punto es el f1 macro medio en validación cruzada (5 pedazos del entrenamiento) y la raya va de "
+    "un desvío abajo a un desvío arriba: muestra cuánto se mueve el número de un pedazo a otro. La línea punteada es el "
+    f"piso ({num(piso)}). El random forest le gana a la regresión logística por {num(rf.f1 - rl.f1)}, más que el desvío "
+    "de los dos; el gradient boosting empata con el bosque, pero su raya es más larga: es menos estable. El eje empieza "
+    "en 0,46 para que se vean las diferencias.")
+puntos = alt.Chart(comp).mark_point(filled=True, size=90, color=AZUL).encode(
+    x=alt.X("f1:Q", scale=alt.Scale(domain=[0.46, 0.72]), title="f1 macro (media ± desvío)"),
+    y=alt.Y("familia:N", sort=list(comp.sort_values("f1", ascending=False)["familia"]), title=None,
+            axis=alt.Axis(labelOverlap=False, labelLimit=200)))
+errores = alt.Chart(comp).mark_errorbar(color=AZUL).encode(
+    x=alt.X("min:Q", scale=alt.Scale(domain=[0.46, 0.72]), title="f1 macro (media ± desvío)"), x2="max:Q",
+    y=alt.Y("familia:N", sort=list(comp.sort_values("f1", ascending=False)["familia"]))
+).transform_calculate(min="datum.f1 - datum.desvio", max="datum.f1 + datum.desvio")
+linea_piso = alt.Chart(pd.DataFrame({"piso": [piso]})).mark_rule(strokeDash=[4, 3], color="#777").encode(x="piso:Q")
+grafico((errores + puntos + linea_piso).properties(height=260, title="Eje recortado de 0,46 a 0,72; "
+                "la línea punteada es el piso"), width="stretch")
+
+st.write(
+    "**Dónde se equivoca: los que se le escapan.** Cada barra es un club top 20 de destino y cuenta los fichajes del "
+    "test que llegaron a él: en azul, los que el modelo encontró (verdaderos positivos); en celeste, los que se le "
+    "escaparon (falsos negativos). Encuentra a los que van a los clubes que compran jugadores consagrados, y pierde "
+    "casi todos los del Porto, la Roma o el Benfica: están en el top 20 por sus resultados en copas europeas, pero "
+    "fichan como clubes medianos, jugadores que se parecen a cualquier otro fichaje de su liga.")
+clubes_test = pd.DataFrame(resumen["clubes_test"]).head(12)
+largo_c = clubes_test.melt(id_vars="club", value_vars=["encontrados", "perdidos"], var_name="qué pasó",
+                           value_name="fichajes")
+largo_c["qué pasó"] = largo_c["qué pasó"].replace({"encontrados": "lo encontró (verdadero positivo)",
+                                                   "perdidos": "se le escapó (falso negativo)"})
+grafico(alt.Chart(largo_c).mark_bar().encode(
+    y=alt.Y("club:N", sort=list(clubes_test["club"]), title=None, axis=alt.Axis(labelLimit=220, labelOverlap=False)),
+    x=alt.X("fichajes:Q", title="fichajes del test que llegaron a ese club top 20", stack="zero"),
+    color=alt.Color("qué pasó:N", scale=alt.Scale(domain=["lo encontró (verdadero positivo)", "se le escapó (falso negativo)"],
+                                                 range=[AZUL, CELESTE]), legend=alt.Legend(title=None, orient="top", labelLimit=320)),
+    order=alt.Order("qué pasó:N"), tooltip=["club", "qué pasó", "fichajes"]).properties(height=330), width="stretch")
+
+st.write(
+    "**Dónde se equivoca: los que señala de más.** Son los jugadores que el modelo marcó como «top 20» y no llegaron "
+    "(falsos positivos). Las barras naranjas dicen a qué puesto del ranking UEFA fue en realidad su club; las marcas "
+    "negras, a dónde fue el resto de los que no llegaron, como referencia. Cada grupo suma 100 %. Los señalados se "
+    f"amontonan justo debajo del corte: el {pct(fp_cerca)} fue a un club del puesto 21 al 100 (McTominay al Napoli, De "
+    f"Ketelaere al Milan), mientras que del resto, el {pct(resumen['vn_destino']['puesto 101 o más'])} terminó del "
+    "puesto 101 para abajo. Tienen perfil de top 20: los compró un club grande, pero no uno de los 20 primeros.")
+destino = pd.DataFrame({"destino real": list(resumen["fp_destino"]),
+                        "falsos positivos": list(resumen["fp_destino"].values()),
+                        "negativos": [resumen["vn_destino"][k] for k in resumen["fp_destino"]]})
+base_d = alt.Chart(destino).encode(
+    x=alt.X("destino real:N", sort=list(resumen["fp_destino"]), title="a dónde fueron en realidad",
+            axis=alt.Axis(labelAngle=0)))
+barras_d = base_d.mark_bar(color=NARANJA, size=60).encode(
+    y=alt.Y("falsos positivos:Q", axis=alt.Axis(format="%"), title="% del grupo", scale=alt.Scale(domain=[0, 0.6])),
+    tooltip=["destino real", alt.Tooltip("falsos positivos:Q", format=".0%", title="los que el modelo señaló"),
+             alt.Tooltip("negativos:Q", format=".0%", title="el resto de los que no llegaron")])
+textos_d = base_d.mark_text(dy=-8, color=NARANJA, fontWeight="bold").encode(
+    y=alt.Y("falsos positivos:Q", scale=alt.Scale(domain=[0, 0.6])), text=alt.Text("falsos positivos:Q", format=".0%"))
+marcas_d = base_d.mark_tick(color="#1d2329", thickness=3, size=70).encode(
+    y=alt.Y("negativos:Q", scale=alt.Scale(domain=[0, 0.6])))
+grafico((barras_d + textos_d + marcas_d).properties(height=240), width="stretch")
+st.caption("Barras naranjas: los que el modelo señaló y no llegaron a un top 20. Marca negra: el resto de los que no "
+           "llegaron, como referencia de a dónde va un fichaje cualquiera.")
+
+
+# ------------------------------------------------------------------ los falsos positivos, uno por uno
+FOTOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "imagenes", "jugadores")
+COMMONS = "https://commons.wikimedia.org/wiki/File:"
+CREDITOS = {  # archivo: (autor, licencia, archivo en Wikimedia Commons)
+    "isak": ("Mikael Hervestad", "CC BY-SA 4.0", "Alexander_Isak_-_Sweden_-_Greece21_(cropped).jpg"),
+    "mctominay": ("Bryan Berlin", "CC BY-SA 4.0", "Scott_McTominay_Scotland_v_Bolivia_6_June_2026-41.jpg"),
+    "modric": ("Bryan Berlin", "CC BY-SA 4.0", "Luka_Modric_Croatia_v_Portugal_2_July_2026-055.jpg"),
+    "de_ketelaere": ("Bryan Berlin", "CC BY-SA 4.0", "Charles_De_Ketelaere_USMNT_v_Belgium_Mar_28_2026-76_(cropped).jpg"),
+    "osimhen": ("Fédération Guinéenne de Football", "dominio público", "Victor-osimhen-nigeria-2024-3-4.jpg"),
+    "greenwood": ("Zafer", "CC BY-SA 4.0", "Mason_Greenwood_11_Fenerbahçe_20260805_(4)_(cropped)_(cropped).JPG"),
+    "paqueta": ("Bryan Berlin", "CC BY-SA 4.0", "Lucas_Paqueta_Brazil_V_Morocco_13_June_2026-134_(cropped).jpg"),
+}
+
+
+def foto(columna, archivo):
+    autor, licencia, original = CREDITOS[archivo]
+    columna.image(os.path.join(FOTOS, archivo + ".jpg"), width=170)
+    enlace = f", [Wikimedia Commons]({COMMONS}{original.replace(' ', '_')})" if original else ""
+    columna.caption(f"Foto: {autor}, {licencia}{enlace}")
+
+
+PLURAL = {"Arquero": "arqueros", "Defensor central": "defensores centrales", "Lateral": "laterales",
+          "Mediocampo defensivo": "mediocampistas defensivos", "Mediocampo ofensivo": "mediocampistas ofensivos",
+          "Delantero centro": "delanteros centro", "Delantero extremo": "extremos"}
+
+
+@functools.lru_cache(maxsize=32)
+def foto_base64(archivo):
+    with open(os.path.join(FOTOS, archivo + ".jpg"), "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+
+def millones(x):
+    return f"{x / 1e6:,.0f} M€".replace(",", ".")
+
+
+def fichaje(nombre, destino):
+    """Un fichaje por nombre y club de destino (si está repetido, el de más probabilidad)."""
+    f = fichajes[fichajes["nombre"].eq(nombre) & fichajes["club_destino"].eq(destino)]
+    return None if f.empty else f.sort_values("proba", ascending=False).iloc[0]
+
+
+resultado = fichajes["resultado"].str.split(":").str[0]
+fps = fichajes[resultado.eq("falso positivo")].copy()
+# los cuatro tipos, en este orden: un fichaje va al primero que le corresponde
+fps["tipo"] = np.select([fps["club_destino_pais"].eq("England"), fps["edad_al_fichaje"] >= 28,
+                         fps["edad_al_fichaje"] <= 21], ["premier", "veteranos", "jovenes"], "casi")
+grupos_fp = {"verdaderos positivos": fichajes[resultado.eq("verdadero positivo")],
+             "falsos positivos": fps, "verdaderos negativos": fichajes[resultado.eq("verdadero negativo")]}
+costos = pd.DataFrame({"grupo": ["llegaron y el modelo los señaló (verdaderos positivos)",
+                                 "el modelo los señaló y no llegaron (falsos positivos)",
+                                 "no llegaron y el modelo no los señaló (verdaderos negativos)"],
+                       "costo": [g["coste_fichaje_eur"].median() for g in grupos_fp.values()],
+                       "color": [AZUL, NARANJA, GRIS]})
+rend_fp = {k: g["score_posicion"].median() for k, g in grupos_fp.items()}
+min_fp = {k: pd.to_numeric(g["stat_minutes"], errors="coerce").median() for k, g in grupos_fp.items()}
+
+st.markdown("#### Los falsos positivos: el modelo dijo «llega» y no llegaron")
+st.write(
+    f"Sobre los {miles(len(fichajes))} fichajes, cada uno con la predicción de un modelo que no lo vio, hay "
+    f"**{miles(len(fps))} falsos positivos**: el modelo dijo «llega» y no llegaron. No son jugadores malos que el "
+    f"modelo sobrevaloró. Tuvieron temporadas de nivel top —{num(rend_fp['falsos positivos'], 2)} desvíos sobre el "
+    f"promedio de su puesto y {miles(min_fp['falsos positivos'])} minutos de mediana, cerca de los que sí llegaron "
+    f"({num(rend_fp['verdaderos positivos'], 2)} y {miles(min_fp['verdaderos positivos'])})— y los clubes que los "
+    "compraron también los vieron así: el gráfico muestra cuánto se pagó, en mediana, por cada grupo. Por un falso "
+    "positivo se pagó varias veces más que por un fichaje común. El precio no entra al modelo (se conoce recién en el "
+    "fichaje), pero sirve para leer el error después. Como jugaron casi toda la temporada, tampoco son lesionados.")
+base_cost = alt.Chart(costos).encode(y=alt.Y("grupo:N", sort=list(costos["grupo"]), title=None,
+                                             axis=alt.Axis(labelLimit=420)))
+grafico((base_cost.mark_bar().encode(
+    x=alt.X("costo:Q", title="costo del fichaje, mediana (millones de euros)",
+            axis=alt.Axis(labelExpr="datum.value / 1e6")),
+    color=alt.Color("color:N", scale=None), tooltip=[alt.Tooltip("costo:Q", format=",.0f", title="euros")])
+    + base_cost.mark_text(align="left", dx=5, color="#1d2329").encode(
+        x="costo:Q", text=alt.Text("etiqueta:N"))).transform_calculate(
+            etiqueta="format(datum.costo / 1e6, '.0f') + ' M€'").properties(height=150), width="stretch")
+st.markdown("##### ¿Por qué no llegaron? Cuatro tipos")
+st.write(
+    "Mirando a dónde fueron y quiénes eran, los falsos positivos se separan en **cuatro tipos**; cada fichaje va al "
+    "primero que le corresponde, en este orden. Para cada tipo: qué lo explica, sus números, un ejemplo y una tabla "
+    "con otros casos, con lo mismo que mira el modelo para decidir —rendimiento para su puesto, club y liga de "
+    "origen, edad— y, abajo, dos filas para comparar: la mediana de los que llegaron y la de todos los fichajes.")
+
+OPERACION = {"compra": "compra", "libre": "libre", "cesion": "préstamo", "cesion_con_cargo": "préstamo con cargo"}
+
+
+def fila_referencia(nombre, grupo):
+    """La mediana de un grupo, para comparar contra los casos de la tabla."""
+    return {"jugador": nombre, "edad": miles(grupo["edad_al_fichaje"].median()),
+            "rendimiento vs. su puesto": num(grupo["score_posicion"].median(), 2),
+            "minutos": miles(pd.to_numeric(grupo["stat_minutes"], errors="coerce").median()),
+            "liga top 5": f"{pct(grupo['club_origen_liga_es_top5'].astype(float).mean())} sí",
+            "coef. UEFA del origen": num(grupo["club_origen_coeficiente_uefa"].median(), 1),
+            "probabilidad": num(grupo["proba"].median(), 2)}
+
+
+def tabla_casos(casos, g):
+    """Los casos de un tipo, con lo que mira el modelo, y dos filas de referencia abajo."""
+    filas = []
+    for n_, d_ in casos:
+        f_ = fichaje(n_, d_)
+        if f_ is None or f_.name not in g.index:
+            continue
+        coef = f_.club_origen_coeficiente_uefa
+        filas.append({"jugador": n_, "temporada": f_.temporada_fichaje, "puesto": f_.grupo_posicion,
+                      "edad": miles(f_.edad_al_fichaje), "rendimiento vs. su puesto": num(f_.score_posicion, 2),
+                      "minutos": miles(f_.stat_minutes) if pd.notna(f_.stat_minutes) else "—",
+                      "club de origen": f_.club_origen, "liga top 5": "sí" if f_.club_origen_liga_es_top5 else "no",
+                      "coef. UEFA del origen": num(coef, 1) if pd.notna(coef) else "sin ranking",
+                      "a (club real)": f"{f_.club_destino} (puesto {f_.club_destino_ranking_uefa})",
+                      "operación": OPERACION.get(f_.tipo_operacion, f_.tipo_operacion),
+                      "probabilidad": num(f_.proba, 2)})
+    if not filas:
+        return None
+    filas += [fila_referencia("→ mediana de los que llegaron", grupos_fp["verdaderos positivos"]),
+              fila_referencia("→ mediana de todos los fichajes", fichajes)]
+    orden = ["jugador", "a (club real)", "probabilidad", "rendimiento vs. su puesto", "minutos", "edad",
+             "club de origen", "liga top 5", "coef. UEFA del origen", "operación", "puesto", "temporada"]
+    return pd.DataFrame(filas).reindex(columns=orden).fillna("")
+
+
+TIPOS_FP = [
+    ("premier", "1 · La plata de la Premier",
+     "Fueron a clubes ingleses que no están en el top 20 de UEFA porque no juegan (o juegan poco) copas europeas, "
+     "pero que por los derechos de televisión de la Premier League pagan como un grande. Para el modelo, el destino "
+     "tenía la billetera de un top 20; para el ranking UEFA, no.",
+     ("Alexander Isak", "Newcastle United", "isak",
+      "Rindió {rend} desvíos por encima del promedio de los {plural} y jugó {minutos} minutos en la Real Sociedad: el "
+      "modelo le dio **{proba}**. Lo compró el Newcastle (puesto {puesto} de UEFA), que paga como un grande pero casi "
+      "no juega en Europa. Tres temporadas después, en 2025, el **Liverpool** (puesto 4) pagó por él un récord del "
+      "fútbol inglés, y ahí el modelo sí dijo «llega» ({proba_despues}): leyó bien al jugador, sólo que antes de "
+      "tiempo.", ("Alexander Isak", "Liverpool FC")),
+     [("Sandro Tonali", "Newcastle United"), ("Moussa Diaby", "Aston Villa"), ("Pau Torres", "Aston Villa"),
+      ("Nikola Milenković", "Nottingham Forest"), ("Amadou Onana", "Aston Villa"),
+      ("Matheus Nunes", "Wolverhampton Wanderers"), ("Yoane Wissa", "Newcastle United")]),
+    ("casi", "2 · Casi top 20",
+     "Fueron a clubes grandes de Europa que quedaron justo debajo del corte: el Milan, el Napoli, el Marsella o la "
+     "Lazio. El puesto 20 es una línea que el perfil del jugador no ve: para el modelo, un jugador de un club del "
+     "puesto 23 se parece mucho a uno del puesto 18.",
+     ("Scott McTominay", "SSC Napoli", "mctominay",
+      "Pasó del Manchester United al Napoli, puesto {puesto} de UEFA: a tres lugares del corte. Rindió {rend} desvíos "
+      "sobre su puesto, jugó {minutos} minutos, y el modelo le dio **{proba}**. En su primera temporada en Italia fue "
+      "elegido el mejor jugador de la Serie A y el Napoli salió campeón: el modelo no se equivocó sobre el jugador, "
+      "sino sobre la línea.", None),
+     [("Mattéo Guendouzi", "Olympique Marseille"), ("Romelu Lukaku", "SSC Napoli"),
+      ("Christopher Nkunku", "AC Milan"), ("Ardon Jashari", "AC Milan"), ("Malik Tillman", "PSV Eindhoven"),
+      ("Sergiño Dest", "PSV Eindhoven")]),
+    ("veteranos", "3 · Veteranos: el último gran contrato",
+     "Tienen 28 años o más y rinden como un top —son el grupo con mejor rendimiento—, pero ningún top 20 apuesta "
+     "por un jugador de 30 años. Muchos se van libres al terminar su contrato, a un club que les da un último "
+     "contrato grande.",
+     ("Luka Modrić", "AC Milan", "modric",
+      "Con {edad} años rindió {rend} desvíos por encima del promedio de los {plural} y jugó {minutos} minutos: el "
+      "modelo le dio **{proba}**. Terminó su contrato con el Real Madrid después de trece temporadas y se fue libre "
+      "al Milan (puesto {puesto}). El modelo lee la temporada, no la edad de retiro.", None),
+     [("Leroy Sané", "Galatasaray"), ("Sergio Ramos", "Sevilla FC"), ("Kyle Walker", "AC Milan"),
+      ("Karl Toko Ekambi", "Stade Rennais FC"), ("Dusan Tadic", "Fenerbahce"), ("Marco Asensio", "Fenerbahce")]),
+    ("jovenes", "4 · Jóvenes promesas",
+     "Tienen 21 años o menos. Acá el modelo no los señala por cómo jugaron —en mediana rindieron justo el promedio de "
+     "su puesto: 0 desvíos quiere decir que la mitad estuvo por encima y la mitad por debajo— sino por quiénes son: "
+     "muy jóvenes y, muchos, formados o comprados por clubes gigantes como el PSG, el Bayern, el Real Madrid o el "
+     "Manchester City. El coeficiente UEFA mediano de su club de origen es "
+     f"{num(fps.loc[fps['tipo'].eq('jovenes'), 'club_origen_coeficiente_uefa'].median(), 0)}, contra "
+     f"{num(fichajes['club_origen_coeficiente_uefa'].median(), 0)} de todos los fichajes. De los más jóvenes llegan "
+     "3 de cada 10, pero el modelo no puede saber cuáles. Muchos van a préstamo o a un club intermedio para crecer.",
+     ("Charles De Ketelaere", "AC Milan", "de_ketelaere",
+      "Con {edad} años, después de una gran temporada en el Brujas ({rend} desvíos, {minutos} minutos), lo compró el "
+      "Milan (puesto {puesto}): el modelo le dio **{proba}**. No se adaptó, y al año siguiente pasó al **Atalanta** "
+      "(puesto 18). Ahí sí rindió, el Atalanta lo compró, y con esos números el modelo dijo «llega» ({proba_despues}): "
+      "llegó a un top 20, un año más tarde.", ("Charles De Ketelaere", "Atalanta BC")),
+     [("George Ilenikhena", "AS Monaco"), ("Arnaud Kalimuendo", "Stade Rennais FC"),
+      ("Joshua Zirkzee", "Bologna FC 1909"), ("Nico Paz", "Como 1907"), ("Claudio Echeverri", "Girona FC")]),
+]
+
+for clave, titulo, explicacion, (nombre_ej, destino_ej, archivo_ej, texto_ej, despues), otros in TIPOS_FP:
+    g = fps[fps["tipo"].eq(clave)]
+    st.markdown(f'<div class="tipo-error">{titulo}</div>', unsafe_allow_html=True)
+    st.write(explicacion)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Falsos positivos (y % del total)", f"{miles(len(g))} ({pct(len(g) / len(fps))})")
+    rend_g = g["score_posicion"].median()
+    # muy cerca de 0 se muestra como «≈ 0»: con dos decimales daría un 0,00 que parece exacto y no lo es
+    k2.metric("Rendimiento (mediana)", f"≈ 0 desvíos" if abs(rend_g) < 0.05 else f"{num(rend_g, 2)} desvíos",
+              help=f"Mediana exacta: {num(rend_g, 3)} desvíos respecto del promedio de su puesto. 0 es justo el "
+                   "promedio: la mitad rindió por encima y la mitad por debajo.")
+    if clave == "premier":
+        k3.metric("Costo (mediana)", millones(g["coste_fichaje_eur"].median()))
+        k4.metric("Puesto UEFA del destino (mediana)", miles(g["club_destino_ranking_uefa"].median()))
+    elif clave == "casi":
+        k3.metric("Destino entre los puestos 21 y 50", pct(g["club_destino_ranking_uefa"].le(50).mean()))
+        k4.metric("Costo (mediana)", millones(g["coste_fichaje_eur"].median()))
+    elif clave == "veteranos":
+        k3.metric("Edad (mediana)", f"{miles(g['edad_al_fichaje'].median())} años")
+        k4.metric("Llegaron libres o a préstamo", pct(g["tipo_operacion"].isin(["libre", "cesion"]).mean()))
+    else:
+        k3.metric("Edad (mediana)", f"{miles(g['edad_al_fichaje'].median())} años")
+        k4.metric("Coef. UEFA del club de origen (mediana)", num(g["club_origen_coeficiente_uefa"].median(), 0))
+    ej = fichaje(nombre_ej, destino_ej)
+    if ej is not None:
+        foto_c, texto_c = st.columns([1, 4])
+        foto(foto_c, archivo_ej)
+        segundo = fichaje(*despues) if despues else None
+        texto_c.markdown(f"**El ejemplo: {nombre_ej}** ({ej.club_origen} → {ej.club_destino}, {ej.temporada_fichaje})\n\n"
+                         + texto_ej.format(rend=num(ej.score_posicion, 2), minutos=miles(ej.stat_minutes),
+                                           proba=num(ej.proba, 2), puesto=ej.club_destino_ranking_uefa,
+                                           edad=miles(ej.edad_al_fichaje), plural=PLURAL[ej.grupo_posicion],
+                                           proba_despues=num(segundo.proba, 2) if segundo is not None else "—"))
+    casos_tabla = tabla_casos(otros, g)
+    if casos_tabla is not None:
+        st.markdown("**Otros casos de este tipo**")
+        st.dataframe(casos_tabla, hide_index=True, width="stretch")
+
+st.markdown("##### Casos especiales: lo que no está en los datos")
+st.write(
+    "Algunos errores tienen una causa que ninguna estadística muestra: un conflicto con el club, una investigación, "
+    "una causa judicial. No son la regla, pero muestran el límite de un modelo que sólo mira la cancha.")
+ESPECIALES = [
+    ("Victor Osimhen", "Galatasaray", "osimhen",
+     "Rindió {rend} desvíos por encima del promedio de los {plural} y el modelo le dio **{proba}**. "
+     "Pero su relación con el Napoli se había roto: en 2023 la cuenta del club publicó videos burlándose de él, y en "
+     "2024 lo dejaron fuera de la lista de la Serie A y le sacaron la 9. Se fue a préstamo al Galatasaray (puesto "
+     "{puesto}) y en 2025 el Galatasaray lo compró por unos 75 M€."),
+    ("Lucas Paquetá", "West Ham United", "paqueta",
+     "Rindió {rend} desvíos por encima del promedio de los {plural} en el Lyon y el modelo le dio **{proba}**. Fue al "
+     "West Ham (puesto {puesto}), un caso de la plata de la Premier; lo especial vino un año después. En agosto de 2023 "
+     "el **Manchester City** (puesto 3) estaba por comprarlo y el pase se cayó cuando la federación inglesa abrió una "
+     "investigación por apuestas sobre él. En julio de 2025 lo absolvieron de esas acusaciones. Un top 20 lo quiso: "
+     "lo frenó algo que no está en los datos."),
+    ("Mason Greenwood", "Olympique Marseille", "greenwood",
+     "Con 22 años rindió {rend} desvíos sobre su puesto a préstamo en el Getafe, y el modelo le dio **{proba}**. Por la "
+     "causa judicial en su contra —archivada a principios de 2023— el Manchester United decidió no volver a contar con "
+     "él y en 2024 lo vendió al Marsella (puesto {puesto})."),
+]
+columnas_esp = st.columns(3, gap="large")
+for col, (nombre_e, destino_e, archivo_e, texto_e) in zip(columnas_esp, ESPECIALES):
+    e = fichaje(nombre_e, destino_e)
+    if e is None:
+        continue
+    foto(col, archivo_e)
+    col.markdown(f"**{nombre_e}** ({e.club_origen} → {e.club_destino}, {e.temporada_fichaje})\n\n"
+                 + texto_e.format(rend=num(e.score_posicion, 2), proba=num(e.proba, 2), plural=PLURAL[e.grupo_posicion],
+                                  puesto=e.club_destino_ranking_uefa))
+
+
+# ------------------------------------------------------------------ los falsos negativos, uno por uno
+CREDITOS.update({
+    "lucas_hernandez": ("Bryan Berlin", "CC BY-SA 4.0", "Lucas_Hernandez_France_v_Senegal_16_June_2026-281.jpg"),
+    "enzo_fernandez": ("Bryan Berlin", "CC BY-SA 4.0", "Enzo_Fernandez_Argentina_v_Spain_19_July_2026-050_(cropped).jpg"),
+    "tel": ("Zack Nani", "CC BY 3.0", "Mathys_Tel_en_2026.png"),
+    "barcola": ("Bryan Berlin", "CC BY-SA 4.0", "Bradley_Barcola_France_v_Spain_7.24.26-112_(cropped).jpg"),
+    "olise": ("Bryan Berlin", "CC BY-SA 4.0", "Michael_Olise_France_v_Senegal_16_June_2026-307_(cropped).jpg"),
+    "mudryk": ("Darren Walsh / Getty Images", "la misma foto de la portada", None),
+    "wesley_fofana": ("Ardfern", "CC BY-SA 4.0", "Wesley_Fofana_2022.jpg"),
+    "lavia": ("Timmy96", "CC0", "Roméo_Lavia_20042025_(1)_cropped.jpg"),
+    "aubameyang": ("Chensiyuan", "CC BY-SA 4.0", "1_Pierre-Emerick_Aubameyang_(cropped).jpg"),
+    "sancho": ("Ardfern", "CC BY-SA 4.0", "Manchester_United_v_Liverpool,_22_August_2022_(33)_(cropped).jpg"),
+    "nicolas_jackson": ("Bryan Berlin", "CC BY-SA 4.0", "Nicolas_Jackson_France_v_Senegal_16_June_2026-369_(cropped).jpg"),
+})
+
+fns = fichajes[resultado.eq("falso negativo")].copy()
+fns["minutos"] = pd.to_numeric(fns["stat_minutes"], errors="coerce")
+TOP20 = set(fichajes.loc[fichajes["es_destino_top_20"].astype(bool), "club_destino"])
+# los tipos, en este orden; el Chelsea va primero porque tiene su propio bloque al final
+fns["tipo"] = np.select(
+    [fns["club_destino"].eq("Chelsea FC"), fns["club_origen"].isin(TOP20),
+     fns["club_destino"].isin(["FC Porto", "SL Benfica"]), fns["minutos"].lt(900), fns["edad_al_fichaje"] <= 21,
+     fns["nivel UEFA del club de origen"].ne("alto")],
+    ["chelsea", "nombre", "poder", "sin_minutos", "jovenes", "sin_peso"], "otros")
+minutos_g = {"llegaron y el modelo los señaló (verdaderos positivos)": grupos_fp["verdaderos positivos"],
+             "llegaron y el modelo no los vio (falsos negativos)": fns,
+             "no llegaron y el modelo no los señaló (verdaderos negativos)": grupos_fp["verdaderos negativos"]}
+tabla_min = pd.DataFrame({"grupo": list(minutos_g),
+                          "minutos": [pd.to_numeric(g["stat_minutes"], errors="coerce").median() for g in minutos_g.values()],
+                          "color": [AZUL, CELESTE, GRIS]})
+rend_fn, vp_ = fns["score_posicion"].median(), grupos_fp["verdaderos positivos"]
+
+st.markdown("#### Los falsos negativos: llegaron y el modelo no los vio")
+st.write(
+    f"Hay **{miles(len(fns))} falsos negativos**: jugadores que llegaron a un top 20 y el modelo dijo «no llega». Al revés "
+    "que los falsos positivos, estos **no tenían perfil de top 20** en lo que mira el modelo: rindieron "
+    f"{num(rend_fn, 2)} desvíos sobre el promedio de su puesto (los que el modelo encontró, "
+    f"{num(vp_['score_posicion'].median(), 2)}), el {pct(fns['club_origen_liga_es_top5'].astype(float).mean())} venía "
+    f"de una liga top 5 (contra {pct(vp_['club_origen_liga_es_top5'].astype(float).mean())}) y jugaron bastante menos, "
+    "como muestra el gráfico: los minutos de la temporada anterior, en mediana, de cada grupo. El modelo leyó bien la "
+    "temporada; lo que no puede ver es por qué un club grande los compró igual.")
+base_min = alt.Chart(tabla_min).encode(y=alt.Y("grupo:N", sort=list(tabla_min["grupo"]), title=None,
+                                               axis=alt.Axis(labelLimit=420)))
+grafico((base_min.mark_bar().encode(
+    x=alt.X("minutos:Q", title="minutos jugados la temporada anterior, mediana"), color=alt.Color("color:N", scale=None),
+    tooltip=[alt.Tooltip("minutos:Q", format=",.0f")])
+    + base_min.mark_text(align="left", dx=5, color="#1d2329").encode(x="minutos:Q", text=alt.Text("minutos:Q", format=",.0f")))
+    .properties(height=150), width="stretch")
+
+st.markdown("##### ¿Por qué se le escaparon? Cinco tipos")
+st.write(
+    "Mirando de dónde venían y quién los compró, los falsos negativos se separan en **cinco tipos**; cada fichaje va al "
+    "primero que le corresponde, en este orden. Los fichajes del Chelsea quedan aparte, en su propio bloque al final. "
+    "Como antes: qué lo explica, sus números, un ejemplo y una tabla con otros casos y las dos filas para comparar.")
+
+
+def bloque_fn(clave, titulo, explicacion, metricas, ejemplo, otros):
+    g = fns[fns["tipo"].eq(clave)]
+    st.markdown(f'<div class="tipo-error-fn">{titulo}</div>', unsafe_allow_html=True)
+    st.write(explicacion)
+    cols = st.columns(4)
+    cols[0].metric("Falsos negativos (y % del total)", f"{miles(len(g))} ({pct(len(g) / len(fns))})")
+    for col, (etiqueta, valor) in zip(cols[1:], metricas(g)):
+        col.metric(etiqueta, valor)
+    nombre_ej, destino_ej, archivo_ej, texto_ej = ejemplo
+    ej = fichaje(nombre_ej, destino_ej)
+    if ej is not None:
+        foto_c, texto_c = st.columns([1, 4])
+        foto(foto_c, archivo_ej)
+        coef = ej.club_origen_coeficiente_uefa
+        texto_c.markdown(f"**El ejemplo: {nombre_ej}** ({ej.club_origen} → {ej.club_destino}, {ej.temporada_fichaje})\n\n"
+                         + texto_ej.format(rend=num(ej.score_posicion, 2), minutos=miles(ej.stat_minutes),
+                                           proba=num(ej.proba, 2), puesto=ej.club_destino_ranking_uefa,
+                                           edad=miles(ej.edad_al_fichaje), plural=PLURAL[ej.grupo_posicion],
+                                           coef=num(coef, 0) if pd.notna(coef) else "sin ranking"))
+    casos_tabla = tabla_casos(otros, g)
+    if casos_tabla is not None:
+        st.markdown("**Otros casos de este tipo**")
+        st.dataframe(casos_tabla, hide_index=True, width="stretch")
+
+
+def mediana(g, col):
+    return pd.to_numeric(g[col], errors="coerce").median()
+
+
+bloque_fn(
+    "nombre", "1 · Un nombre, no una temporada",
+    "Venían de **otro club top 20**: ya eran de la élite. Llegaron después de una temporada floja o con pocos minutos, y "
+    "el club que los compró apostó por lo que habían demostrado antes, muchas veces barato o a préstamo. El modelo sólo "
+    "ve la última temporada, así que no ve el nombre.",
+    lambda g: [("Rendimiento (mediana)", f"{num(mediana(g, 'score_posicion'), 2)} desvíos"),
+               ("Costo (mediana)", millones(mediana(g, "coste_fichaje_eur"))),
+               ("Llegaron a préstamo", pct(g["tipo_operacion"].str.startswith("cesion").mean()))],
+    ("Lucas Hernández", "Paris Saint-Germain", "lucas_hernandez",
+     "Campeón del mundo con Francia en 2018. En el primer partido del Mundial 2022 se rompió los ligamentos cruzados, y "
+     "en la temporada anterior al fichaje jugó {minutos} minutos ({rend} desvíos): el modelo le dio **{proba}**. El PSG "
+     "(puesto {puesto}) pagó igual unos 45 M€ por él. Lo compró por su nombre, no por su temporada."),
+    [("Gabriel Jesus", "FC Barcelona"), ("Robin Gosens", "Inter Milan"), ("Leandro Paredes", "Juventus FC"),
+     ("Renato Sanches", "AS Roma"), ("Julian Draxler", "SL Benfica"), ("Kepa Arrizabalaga", "Arsenal FC"),
+     ("Clément Lenglet", "Atlético de Madrid"), ("Cristian Romero", "Tottenham Hotspur")])
+
+bloque_fn(
+    "poder", "2 · Clubes grandes con menor poder adquisitivo",
+    "El Porto y el Benfica están en el top 20 de UEFA por sus resultados en copas europeas, pero no pueden pagar lo que "
+    "pagan los ingleses o los españoles. Compran barato, muchas veces en Sudamérica o en ligas más chicas, jugadores que "
+    "todavía no tienen perfil de top 20, y los venden caros cuando explotan. Para el modelo, son fichajes comunes.",
+    lambda g: [("Costo (mediana)", millones(mediana(g, "coste_fichaje_eur"))),
+               ("Vienen de liga top 5", pct(g["club_origen_liga_es_top5"].astype(float).mean())),
+               ("Rendimiento (mediana)", f"{num(mediana(g, 'score_posicion'), 2)} desvíos")],
+    ("Enzo Fernández", "SL Benfica", "enzo_fernandez",
+     "El Benfica lo compró a River Plate en 2022. Rindió {rend} desvíos sobre el promedio de los {plural} y jugó "
+     "{minutos} minutos, en una liga fuera del top 5: el modelo le dio **{proba}**. Seis meses después fue elegido el "
+     "mejor jugador joven del Mundial 2022, y en enero de 2023 el Chelsea pagó 121 M€ por él, récord del fútbol inglés "
+     "en ese momento."),
+    [("Samu Aghehowa", "FC Porto"), ("Richard Ríos", "SL Benfica"), ("Marcos Leonardo", "SL Benfica"),
+     ("Arthur Cabral", "SL Benfica"), ("David Carmo", "FC Porto"), ("Victor Froholdt", "FC Porto"),
+     ("Gabri Veiga", "FC Porto")])
+
+bloque_fn(
+    "sin_minutos", "3 · Una temporada casi sin jugar",
+    "Jugaron menos de 900 minutos la temporada anterior —diez partidos completos—, por una lesión o porque eran "
+    "suplentes o muy chicos. Con tan pocos minutos, sus estadísticas casi no dicen nada y el modelo no tiene en qué "
+    "apoyarse. El club que los compró se fijó en otra cosa: el potencial, o lo que habían hecho antes.",
+    lambda g: [("Minutos (mediana)", miles(mediana(g, "stat_minutes"))),
+               ("Edad (mediana)", f"{miles(mediana(g, 'edad_al_fichaje'))} años"),
+               ("Costo (mediana)", millones(mediana(g, "coste_fichaje_eur")))],
+    ("Mathys Tel", "Bayern Munich", "tel",
+     "Con {edad} años había jugado {minutos} minutos en el Rennes: el modelo le dio **{proba}**. El Bayern (puesto "
+     "{puesto}) pagó igual unos 20 M€ por él. Compró lo que podía llegar a ser, no lo que había jugado."),
+    [("Lucas Beraldo", "Paris Saint-Germain"), ("Robinio Vaz", "AS Roma"), ("Yan Diomande", "RB Leipzig"),
+     ("Honest Ahanor", "Atalanta BC"), ("Souza", "Tottenham Hotspur"), ("Abdoul Koné", "RB Leipzig")])
+
+bloque_fn(
+    "jovenes", "4 · Las apuestas jóvenes",
+    "Tienen 21 años o menos y sí jugaron, pero con números todavía comunes. Los grandes los compran caros por lo que "
+    "creen que van a ser. Varios terminaron siendo figuras: el modelo, que sólo mira el pasado, no los podía ver.",
+    lambda g: [("Edad (mediana)", f"{miles(mediana(g, 'edad_al_fichaje'))} años"),
+               ("Costo (mediana)", millones(mediana(g, "coste_fichaje_eur"))),
+               ("Rendimiento (mediana)", f"{num(mediana(g, 'score_posicion'), 2)} desvíos")],
+    ("Bradley Barcola", "Paris Saint-Germain", "barcola",
+     "Con {edad} años rindió {rend} desvíos sobre el promedio de los {plural} y jugó {minutos} minutos en el Lyon: el "
+     "modelo le dio **{proba}**. El PSG (puesto {puesto}) lo compró en 2023, se ganó el puesto, y en 2025 ganó la "
+     "Champions League con el PSG."),
+    [("Jérémy Doku", "Manchester City"), ("Benjamin Sesko", "RB Leipzig"), ("Hugo Ekitiké", "Paris Saint-Germain"),
+     ("Abdukodir Khusanov", "Manchester City"), ("Patrick Dorgu", "Manchester United"),
+     ("Wilson Odobert", "Tottenham Hotspur"), ("Maximilian Beier", "Borussia Dortmund")])
+
+bloque_fn(
+    "sin_peso", "5 · El salto desde un club que no es de los grandes de Europa",
+    "Rindieron bien, pero en un club que juega poco o nada las copas europeas: coeficiente UEFA bajo, medio o fuera "
+    "del ranking, como el Crystal Palace, el Leicester o el Bologna. El club de origen es el segundo factor del "
+    "modelo —sin él pierde el 38 % de lo que aprendió—, así que los castiga: el salto directo de un club así a un top "
+    "20 es raro, y el modelo lo da por improbable.",
+    lambda g: [("Rendimiento (mediana)", f"{num(mediana(g, 'score_posicion'), 2)} desvíos"),
+               (f"Coef. UEFA del origen (mediana; los que llegaron: {num(mediana(vp_, 'club_origen_coeficiente_uefa'), 0)})",
+                num(mediana(g, "club_origen_coeficiente_uefa"), 0)),
+               ("Club de origen fuera del ranking", pct(g["club_origen_coeficiente_uefa"].isna().mean()))],
+    ("Michael Olise", "Bayern Munich", "olise",
+     "En el Crystal Palace (coeficiente UEFA {coef}) rindió {rend} desvíos sobre el promedio de los {plural}: el modelo "
+     "le dio **{proba}**, apenas debajo del umbral de 0,25. El Bayern (puesto {puesto}) lo compró en 2024 y se "
+     "convirtió en una de sus figuras."),
+    [("James Maddison", "Tottenham Hotspur"), ("Riccardo Calafiori", "Arsenal FC"), ("Federico Chiesa", "Juventus FC"),
+     ("Kalvin Phillips", "Manchester City"), ("Micky van de Ven", "Tottenham Hotspur"), ("Davide Frattesi", "Inter Milan"),
+     ("Nikola Krstović", "Atalanta BC")])
+
+otros_fn = fns["tipo"].eq("otros").sum()
+st.caption(f"Quedan {miles(otros_fn)} falsos negativos ({pct(otros_fn / len(fns))}) que no entran en ningún tipo: la "
+           "mayoría vienen de clubes de nivel UEFA alto que no son top 20 —el Sporting, el Napoli, la Lazio, el PSV— y "
+           "llegaron con temporadas comunes, como Pedro Porro (Sporting → Tottenham).")
+
+# ------------------------------------------------------------------ el desastre de fichajes del Chelsea
+chelsea = fichajes[fichajes["club_destino"].eq("Chelsea FC")]
+llegadas_top = fichajes[fichajes["es_destino_top_20"].astype(bool)].groupby("club_destino").agg(
+    llegaron=("nombre", "size"), edad=("edad_al_fichaje", "median"))
+salidas = pd.DataFrame(resumen["salidas_top20"])
+fn_chelsea = fns[fns["tipo"].eq("chelsea")]
+
+st.markdown("##### El desastre de fichajes del Chelsea")
+st.write(
+    f"El Chelsea es el top 20 que **más jugadores trajo** en estas cinco temporadas ({miles(len(chelsea))}; el segundo, "
+    f"{miles(llegadas_top['llegaron'].drop('Chelsea FC').max())}) y el que los trajo **más jóvenes** "
+    f"({miles(chelsea['edad_al_fichaje'].median())} años de mediana). El modelo no vio a {miles(len(fn_chelsea))} de "
+    f"ellos: llegaron con temporadas comunes —{num(fn_chelsea['score_posicion'].median(), 2)} desvíos sobre su puesto y "
+    f"{miles(mediana(fn_chelsea, 'stat_minutes'))} minutos de mediana— y aun así costaron "
+    f"{millones(mediana(fn_chelsea, 'coste_fichaje_eur'))} de mediana. Compra mucho, caro, joven y por poco: a veces, "
+    "por media temporada buena. Y la mayoría no se queda: el gráfico muestra, para cada top 20, qué parte de los que "
+    f"llegaron se fue del club en una temporada posterior (fichajes hasta {resumen['ultima_temporada'][:4]}, para que "
+    "todos tengan un «después»).")
+salidas = salidas.sort_values("se_fueron", ascending=False)
+salidas["color"] = np.where(salidas["club_destino"].eq("Chelsea FC"), CELESTE, GRIS)
+base_s = alt.Chart(salidas).encode(y=alt.Y("club_destino:N", sort=list(salidas["club_destino"]), title=None,
+                                           axis=alt.Axis(labelLimit=220, labelOverlap=False)))
+grafico((base_s.mark_bar().encode(
+    x=alt.X("se_fueron:Q", axis=alt.Axis(format="%"), title="de los que llegaron, % que se fue del club después"),
+    color=alt.Color("color:N", scale=None),
+    tooltip=["club_destino", alt.Tooltip("llegaron:Q", title="llegaron"),
+             alt.Tooltip("se_fueron:Q", format=".0%", title="se fueron después")])
+    + base_s.mark_text(align="left", dx=4, fontSize=11, color="#1d2329").encode(
+        x="se_fueron:Q", text=alt.Text("se_fueron:Q", format=".0%")))
+    .properties(height=440), width="stretch")
+st.write(
+    f"Además, desde 2023 los dueños del Chelsea también son dueños del Strasbourg francés: en nuestros datos hay "
+    f"{resumen['chelsea_a_strasbourg']} pases del Chelsea al Strasbourg, casi siempre jugadores jóvenes que llegaron y "
+    "no tuvieron lugar. Abajo, seis casos que muestran el problema —deslizá para ver todos—, cada uno con lo que dijo el "
+    "modelo y lo que pasó después.")
+
+CARRUSEL = [
+    ("Mykhaylo Mudryk", "mudryk",
+     "Lo compró por media temporada brillante: tres goles en la fase de grupos de la Champions con el Shakhtar. En la "
+     "temporada anterior, la que mira el modelo, había jugado {minutos} minutos. En diciembre de 2024 lo suspendieron "
+     "provisoriamente por un control positivo de meldonium, y el caso recién se cerró en 2026."),
+    ("Wesley Fofana", "wesley_fofana",
+     "Llegó del Leicester después de fracturarse la pierna en 2021 ({minutos} minutos en la temporada anterior). En "
+     "julio de 2023 se rompió los ligamentos cruzados y se perdió toda la temporada 2023/24."),
+    ("Roméo Lavia", "lavia",
+     "En su primera temporada jugó 32 minutos: un solo partido, contra el Crystal Palace, antes de lesionarse para el "
+     "resto del año."),
+    ("Pierre-Emerick Aubameyang", "aubameyang",
+     "Lo pidió el entrenador, Thomas Tuchel, que fue despedido días después. Su reemplazante lo dejó fuera de la lista de "
+     "la Champions; hizo tres goles y en 2023 se fue libre al Marsella."),
+    ("Jadon Sancho", "sancho",
+     "Llegó a préstamo desde el Manchester United, y el contrato obligaba al Chelsea a comprarlo por unos 25 millones de "
+     "libras al terminar la temporada, salvo que pagara una multa de 5 millones para cancelar la compra. En 2025 el "
+     "Chelsea no llegó a un acuerdo de sueldo con él, pagó la multa y Sancho volvió al United."),
+    ("Nicolas Jackson", "nicolas_jackson",
+     "Llegó del Villarreal por unos 37 M€ y el modelo no lo vio. En su primera temporada fue el tercer jugador de la "
+     "Premier que más ocasiones claras falló (21, sólo detrás de Haaland y Darwin Núñez). En la segunda hizo un solo gol "
+     "en 14 partidos de liga desde enero, y lo expulsaron contra el Newcastle en un partido clave para entrar a la "
+     "Champions. En 2025 se fue a préstamo al Bayern, que sólo estaba obligado a comprarlo (por unos 65 M€) si Jackson "
+     "era titular en 40 partidos. Como suplente de Harry Kane no llegó, y Uli Hoeneß, presidente honorario del Bayern, "
+     "lo dijo en público: no iba a llegar a esos 40 partidos, así que el Bayern no iba a tener que comprarlo."),
+]
+tarjetas = []
+for nombre_c, archivo_c, texto_c in CARRUSEL:
+    c = fichaje(nombre_c, "Chelsea FC")
+    if c is None:
+        continue
+    autor, licencia, original = CREDITOS[archivo_c]
+    costo = ("préstamo" if str(c.tipo_operacion).startswith("cesion")
+             else millones(c.coste_fichaje_eur) if pd.notna(c.coste_fichaje_eur) else "libre")
+    vio = "lo señaló (dijo «llega»)" if c.proba >= resumen["umbral"] else "no lo vio (dijo «no llega»)"
+    tarjetas.append(
+        f'<div class="tarjeta"><img src="data:image/jpeg;base64,{foto_base64(archivo_c)}" alt="{nombre_c}">'
+        f'<div class="cuerpo"><div class="nombre">{nombre_c}</div>'
+        f'<div class="dato">{c.club_origen} → Chelsea · {c.temporada_fichaje} · {miles(c.edad_al_fichaje)} años · {costo}</div>'
+        f'<div class="modelo">Probabilidad del modelo: <b>{num(c.proba, 2)}</b> — {vio}</div>'
+        f'<div>{texto_c.format(minutos=miles(c.stat_minutes) if pd.notna(c.stat_minutes) else "—")}</div>'
+        f'<div class="credito">Foto: {autor}, {licencia}'
+        + (f', <a href="{COMMONS}{original.replace(" ", "_")}" target="_blank">Wikimedia Commons</a>' if original else "")
+        + '</div></div></div>')
+st.markdown('<div class="carrusel">' + "".join(tarjetas) + "</div>", unsafe_allow_html=True)
+
+# los demás fichajes del Chelsea que no se quedaron: se fueron a préstamo, o vendidos a un club fuera del top 20
+no_quedaron = (chelsea[chelsea["salio_mal"].astype(bool) & ~chelsea["nombre"].isin([n for n, _, _ in CARRUSEL])]
+               .sort_values("coste_fichaje_eur", ascending=False).drop_duplicates("nombre"))
+st.markdown("**Otros fichajes del Chelsea que no se quedaron**")
+st.write(
+    f"Además de los seis de arriba, otros {miles(len(no_quedaron))} fichajes del Chelsea se fueron en una temporada "
+    "posterior a préstamo, o vendidos a un club que no es top 20. La última columna dice qué pasó después, según los "
+    "traspasos que registra nuestro pipeline (Transfermarkt).")
+tabla_ch = pd.DataFrame({
+    "jugador": no_quedaron["nombre"], "temporada": no_quedaron["temporada_fichaje"],
+    "edad": no_quedaron["edad_al_fichaje"].map(miles),
+    "de": no_quedaron["club_origen"],
+    "costo": [("préstamo" if str(t).startswith("cesion") else millones(c) if pd.notna(c) else "libre")
+              for t, c in zip(no_quedaron["tipo_operacion"], no_quedaron["coste_fichaje_eur"])],
+    "rendimiento vs. su puesto": no_quedaron["score_posicion"].map(lambda v: num(v, 2)),
+    "minutos": [miles(v) if pd.notna(v) else "—" for v in pd.to_numeric(no_quedaron["stat_minutes"], errors="coerce")],
+    "probabilidad": no_quedaron["proba"].map(lambda v: num(v, 2)),
+    "el modelo": np.where(no_quedaron["proba"] >= resumen["umbral"], "dijo «llega»", "dijo «no llega»"),
+    "qué pasó después": no_quedaron["salidas_despues"]})
+st.dataframe(tabla_ch, hide_index=True, width="stretch")
+
+
+def caso(nombre, destino):
+    """Un fichaje del test, para contar los errores con nombre (si está repetido, el de más probabilidad)."""
+    f = fichajes[fichajes["nombre"].eq(nombre) & fichajes["club_destino"].eq(destino) & fichajes["conjunto"].eq("test")]
+    return None if f.empty else f.sort_values("proba", ascending=False).iloc[0]
+
 
 with st.expander("Cómo lo sabemos"):
-    comp = pd.DataFrame(resumen["comparacion"])
-    piso = resumen["piso"]["media"]
     st.markdown(f"""
-**Para qué un modelo.** Los gráficos de arriba miran un factor por vez. El modelo los mira todos juntos, así que dice
-cuánto aporta cada uno **con los demás presentes** (el club de origen no repite lo que ya dice el rendimiento).
+**Para qué un modelo.** Los gráficos de *Lo que encontramos* miran un factor por vez. El modelo los mira todos juntos,
+así que dice cuánto aporta cada uno **con los demás presentes** (el club de origen no repite lo que ya dice el
+rendimiento).
 
 **La métrica: f1 macro.** Sólo el {pct(resumen['tasa_top20'])} de los fichajes llega a un top 20, así que la accuracy
 premia decir siempre «no» ({num(t['accuracy_siempre_no'])} sin encontrar a nadie). El f1 macro promedia el f1 de las dos
@@ -340,27 +963,14 @@ fichaje, y todos sus fichajes van al mismo pedazo. Armados al azar, el número n
 modelo usa su mejor umbral.
 
 **La comparación.** Cada familia pasó por su grilla de hiperparámetros **antes** de comparar
-({resumen['n_combinaciones']} combinaciones). La mejor versión de cada una, con media y desvío entre los 5 pedazos:
+({resumen['n_combinaciones']} combinaciones). La mejor versión de cada una, con media y desvío entre los 5 pedazos (los
+mismos números del gráfico de las cuatro familias):
 """)
     tabla = comp.assign(**{"hiperparámetros": comp["params"].astype(str)})[
         ["familia", "hiperparámetros", "umbral", "f1", "desvio", "precision", "recall"]]
     tabla = tabla.assign(**{c: tabla[c].map(lambda v: num(v, 3)) for c in ["f1", "desvio", "precision", "recall"]},
                          umbral=tabla["umbral"].map(lambda v: num(v, 2)))
     st.table(tabla.set_index("familia"))
-    puntos = alt.Chart(comp).mark_point(filled=True, size=90, color=AZUL).encode(
-        x=alt.X("f1:Q", scale=alt.Scale(domain=[0.46, 0.72]), title="f1 macro (media ± desvío)"),
-        y=alt.Y("familia:N", sort=list(comp.sort_values("f1", ascending=False)["familia"]), title=None,
-                axis=alt.Axis(labelOverlap=False, labelLimit=200)))
-    errores = alt.Chart(comp).mark_errorbar(color=AZUL).encode(
-        x=alt.X("min:Q", scale=alt.Scale(domain=[0.46, 0.72]), title="f1 macro (media ± desvío)"), x2="max:Q",
-        y=alt.Y("familia:N", sort=list(comp.sort_values("f1", ascending=False)["familia"]))
-    ).transform_calculate(min="datum.f1 - datum.desvio", max="datum.f1 + datum.desvio")
-    linea_piso = alt.Chart(pd.DataFrame({"piso": [piso]})).mark_rule(strokeDash=[4, 3], color="#777").encode(x="piso:Q")
-    grafico((errores + puntos + linea_piso).properties(height=260, title="Eje recortado de 0,46 a 0,72; "
-                    "la línea punteada es el piso"), width="stretch")
-    rf = comp.set_index("familia").loc["random forest"]
-    rl = comp.set_index("familia").loc["regresión logística"]
-    gb = comp.set_index("familia").loc["gradient boosting"]
     st.markdown(f"""
 **El elegido: random forest** (`max_depth=10`, `max_features=0.3`, 300 árboles, umbral {num(resumen['umbral'], 2)}).
 Le gana a la logística por {num(rf.f1 - rl.f1)}, más que el desvío de los dos ({num(rf.desvio)} y {num(rl.desvio)}). El
@@ -370,43 +980,6 @@ boosting empata con el bosque, pero no le gana a la logística por más que su p
 precision {num(t['precision'], 2)}, recall {num(t['recall'], 2)}, accuracy {num(t['accuracy'])}. De {t['vp'] + t['fn']}
 que llegaron, encontró {t['vp']}; de {t['vp'] + t['fp']} que señaló, {t['fp']} no llegaron: 2 de cada 5 señalados llegan,
 cuando la tasa general es 1 de cada 10.
-
-**Dónde se equivoca.** Los que se le escapan van sobre todo a los clubes del top 20 que fichan como medianos (Porto,
-Roma, Benfica): compran jugadores sin perfil de top 20.
-""")
-    clubes_test = pd.DataFrame(resumen["clubes_test"]).head(12)
-    largo_c = clubes_test.melt(id_vars="club", value_vars=["encontrados", "perdidos"], var_name="qué pasó",
-                               value_name="fichajes")
-    largo_c["qué pasó"] = largo_c["qué pasó"].replace({"encontrados": "lo encontró (verdadero positivo)",
-                                                       "perdidos": "se le escapó (falso negativo)"})
-    grafico(alt.Chart(largo_c).mark_bar().encode(
-        y=alt.Y("club:N", sort=list(clubes_test["club"]), title=None, axis=alt.Axis(labelLimit=220, labelOverlap=False)),
-        x=alt.X("fichajes:Q", title="fichajes del test que llegaron a ese club top 20", stack="zero"),
-        color=alt.Color("qué pasó:N", scale=alt.Scale(domain=["lo encontró (verdadero positivo)", "se le escapó (falso negativo)"],
-                                                     range=[AZUL, CELESTE]), legend=alt.Legend(title=None, orient="top", labelLimit=320)),
-        order=alt.Order("qué pasó:N"), tooltip=["club", "qué pasó", "fichajes"]).properties(height=330), width="stretch")
-    st.markdown("Los que señala de más tienen perfil de top 20 y terminan **justo debajo**. "
-                "**De los que no llegaron a un top 20, ¿a qué puesto UEFA fue su club?** (cada grupo suma 100 %)")
-    destino = pd.DataFrame({"destino real": list(resumen["fp_destino"]),
-                            "falsos positivos": list(resumen["fp_destino"].values()),
-                            "negativos": [resumen["vn_destino"][k] for k in resumen["fp_destino"]]})
-    base_d = alt.Chart(destino).encode(
-        x=alt.X("destino real:N", sort=list(resumen["fp_destino"]), title="a dónde fueron en realidad",
-                axis=alt.Axis(labelAngle=0)))
-    barras_d = base_d.mark_bar(color=NARANJA, size=60).encode(
-        y=alt.Y("falsos positivos:Q", axis=alt.Axis(format="%"), title="% del grupo", scale=alt.Scale(domain=[0, 0.6])),
-        tooltip=["destino real", alt.Tooltip("falsos positivos:Q", format=".0%", title="los que el modelo señaló"),
-                 alt.Tooltip("negativos:Q", format=".0%", title="el resto de los que no llegaron")])
-    textos_d = base_d.mark_text(dy=-8, color=NARANJA, fontWeight="bold").encode(
-        y=alt.Y("falsos positivos:Q", scale=alt.Scale(domain=[0, 0.6])), text=alt.Text("falsos positivos:Q", format=".0%"))
-    marcas_d = base_d.mark_tick(color="#1d2329", thickness=3, size=70).encode(
-        y=alt.Y("negativos:Q", scale=alt.Scale(domain=[0, 0.6])))
-    grafico((barras_d + textos_d + marcas_d).properties(height=240), width="stretch")
-    st.caption("Barras naranjas: los que el modelo señaló y no llegaron a un top 20. Marca negra: el resto de los que no "
-               "llegaron, como referencia de a dónde va un fichaje cualquiera.")
-    st.markdown(f"""
-El {pct(fp_cerca)} de los falsos positivos fue a un club del puesto 21 al 100 (McTominay al Napoli, De Ketelaere al
-Milan): el corte en el puesto 20 no se ve en el perfil del jugador.
 
 **Cómo se midió lo que aporta cada factor** (importancia por permutación, Práctica 1, 5.4):
 1. El modelo final predice los fichajes del test y saca un f1 macro de {num(t['f1'])}. El piso, que dice siempre «no
@@ -423,6 +996,37 @@ Se hace por factor y no por columna porque las columnas parecidas se reparten la
 estadísticas pesa poco sola, porque las otras la cubren. Sacando cada factor y reentrenando (Entrega 3, sección 7.1)
 el orden es el mismo: sin las estadísticas el f1 cae 0,093, sin el club de origen 0,039. Ninguno es fuga: todos existen
 antes del fichaje y no usan el destino.
+
+**Por qué se equivoca.** En promedio el modelo ordena bien —los que llegan reciben probabilidades mucho más altas—,
+pero las dos clases se superponen: hay jugadores que llegan con el perfil de los que no, y al revés (Entrega 3,
+secciones 8.1 a 8.3). Casos del test:
+""")
+    osimhen, mudryk = caso("Victor Osimhen", "Galatasaray"), caso("Mykhaylo Mudryk", "Chelsea FC")
+    casos = []
+    if osimhen is not None:
+        casos.append(
+            f"- **Falso positivo, Victor Osimhen** ({osimhen.club_origen} → {osimhen.club_destino}, puesto "
+            f"{osimhen.club_destino_ranking_uefa} de UEFA). En la temporada anterior rindió {num(osimhen.score_posicion, 2)} "
+            f"desvíos por encima del promedio de los delanteros centro, jugó {miles(osimhen.stat_minutes)} minutos y venía "
+            f"de una liga top 5: el modelo le dio **{num(osimhen.proba, 2)}**. Tenía todo el perfil; lo compró un club "
+            "grande, pero no uno del top 20. Lo mismo pasa con De Ketelaere (Brugge → Milan, puesto 34) o McTominay "
+            "(Manchester United → Napoli, puesto 23).")
+    if mudryk is not None:
+        casos.append(
+            f"- **Falso negativo, Mykhaylo Mudryk** ({mudryk.club_origen} → {mudryk.club_destino}). En la temporada "
+            f"anterior al fichaje jugó {miles(mudryk.stat_minutes)} minutos, con un rendimiento de "
+            f"{num(mudryk.score_posicion, 2)} desvíos respecto de los extremos y en una liga fuera del top 5: el modelo le "
+            f"dio **{num(mudryk.proba, 3)}**. El Chelsea lo compró por la primera mitad de esa misma temporada, y el "
+            "modelo sólo ve la temporada **anterior** al fichaje. Que después no rindiera en el Chelsea no cambia la "
+            "cuenta: el modelo predice a dónde llega un jugador, no si valía la pena.")
+    casos.append(
+        "- **Los clubes que fichan como medianos.** El Porto, el Benfica o la Roma compran en su liga o en la de al "
+        "lado, jugadores con perfil de fichaje común (David Carmo, del Braga al Porto; Petar Musa, del Boavista al "
+        "Benfica): el modelo no los ve porque no sabe quién compra.")
+    st.markdown("\n".join(casos) + """
+
+Los dos errores vienen del mismo lugar: el destino depende del club que compra, y eso es justamente lo que el modelo no
+puede usar, porque sería la respuesta escrita de otra forma (fuga).
 """)
 
 # =============================================================================== COPA · EXPLORÁ

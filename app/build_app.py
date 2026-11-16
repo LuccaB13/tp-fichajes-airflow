@@ -182,10 +182,30 @@ def main():
     os.makedirs(salida, exist_ok=True)
     joblib.dump(final, os.path.join(salida, "modelo.joblib"), compress=3)
 
+    # qué pasó después de cada fichaje: las salidas posteriores del jugador desde ese club, en todos los traspasos del
+    # pipeline. No entra al modelo (es el futuro): sirve para leer los errores, por ejemplo los fichajes que no se quedaron
+    tipo_legible = {"compra": "venta", "libre": "libre", "cesion": "préstamo", "cesion_con_cargo": "préstamo"}
+    top20_clubes = set(df.loc[df["es_destino_top_20"].astype(bool), "club_destino"])
+    futuras = (ana.reset_index(names="fila")[["fila", "nombre", "club_destino", "temporada_fichaje"]]
+               .merge(df[["nombre", "club_origen", "club_destino", "temporada_fichaje", "tipo_operacion"]]
+                      .rename(columns={"club_origen": "club_destino", "club_destino": "a", "temporada_fichaje": "t"}),
+                      on=["nombre", "club_destino"]))
+    futuras = futuras[futuras["t"] > futuras["temporada_fichaje"]].sort_values(["fila", "t"])
+    futuras["texto"] = (futuras["t"] + ": " + futuras["tipo_operacion"].map(tipo_legible).fillna("salida") + " a "
+                        + futuras["a"])
+    futuras["fracaso"] = futuras["tipo_operacion"].str.startswith("cesion") | ~futuras["a"].isin(top20_clubes)
+    por_fila = futuras.groupby("fila").agg(salidas_despues=("texto", " · ".join), salio_mal=("fracaso", "any"))
+    ana = ana.join(por_fila)
+    ana["salio_mal"] = ana["salio_mal"].fillna(False).astype(bool)
+
     columnas_app = ["nombre", "temporada_fichaje", "grupo_posicion", "edad_al_fichaje", "club_origen",
                     "club_origen_liga", "club_origen_liga_es_top5", "club_origen_coeficiente_uefa",
                     "stat_minutes", "stat_matches", "club_destino", "club_destino_ranking_uefa",
-                    "es_destino_top_20", "conjunto", "proba", "resultado", "score_posicion"] + list(nv.columns)
+                    "es_destino_top_20", "conjunto", "proba", "resultado", "score_posicion",
+                    # para leer los errores después del hecho: no entran al modelo (son fuga), pero explican
+                    # a dónde fueron y cuánto pagaron por los que el modelo señaló
+                    "coste_fichaje_eur", "tipo_operacion", "club_destino_pais", "salidas_despues",
+                    "salio_mal"] + list(nv.columns)
     ana[columnas_app].to_csv(os.path.join(salida, "fichajes_app.csv"), index=False)
 
     # columnas del modelo de cada fichaje, para «partir de un jugador real»
@@ -216,8 +236,25 @@ def main():
                                     **{f"q{k}": q[k] for k in range(101)}})
     pd.DataFrame(filas_rango).to_csv(os.path.join(salida, "rangos.csv"), index=False)
 
+    # después del fichaje: de los que llegaron a cada top 20, qué parte se fue de ese club en una temporada posterior.
+    # Se buscan las salidas en todos los traspasos del pipeline (df), no sólo en la población de análisis; la última
+    # temporada queda afuera porque todavía no tiene «después».
+    ultima = df["temporada_fichaje"].max()
+    llegadas = ana[ana["es_destino_top_20"].astype(bool) & ana["temporada_fichaje"].lt(ultima)].reset_index(names="fila")
+    salidas = df[["nombre", "club_origen", "temporada_fichaje"]].rename(
+        columns={"club_origen": "club_destino", "temporada_fichaje": "temporada_salida"})
+    cruce = llegadas[["fila", "nombre", "club_destino", "temporada_fichaje"]].merge(salidas, on=["nombre", "club_destino"])
+    se_fueron = set(cruce.loc[cruce["temporada_salida"] > cruce["temporada_fichaje"], "fila"])
+    salidas_top20 = (llegadas.assign(se_fue=llegadas["fila"].isin(se_fueron))
+                     .groupby("club_destino").agg(llegaron=("nombre", "size"), se_fueron=("se_fue", "mean"))
+                     .reset_index())
+    chelsea_a_strasbourg = int((df["club_origen"].eq("Chelsea FC") & df["club_destino"].eq("RC Strasbourg Alsace")).sum())
+
     f1_test = f1_score(y_test, pred_test, average="macro")
     resumen = {
+        "salidas_top20": salidas_top20.to_dict(orient="records"),
+        "ultima_temporada": ultima,
+        "chelsea_a_strasbourg": chelsea_a_strasbourg,
         "construido": date.today().isoformat(),
         "datos": os.path.basename(ruta),
         "pasos": pasos,

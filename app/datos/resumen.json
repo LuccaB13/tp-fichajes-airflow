@@ -1,5 +1,109 @@
 {
- "construido": "2026-11-09",
+ "salidas_top20": [
+  {
+   "club_destino": "AS Roma",
+   "llegaron": 44,
+   "se_fueron": 0.22727272727272727
+  },
+  {
+   "club_destino": "Arsenal FC",
+   "llegaron": 24,
+   "se_fueron": 0.2916666666666667
+  },
+  {
+   "club_destino": "Atalanta BC",
+   "llegaron": 37,
+   "se_fueron": 0.32432432432432434
+  },
+  {
+   "club_destino": "Atlético de Madrid",
+   "llegaron": 32,
+   "se_fueron": 0.375
+  },
+  {
+   "club_destino": "Bayer 04 Leverkusen",
+   "llegaron": 32,
+   "se_fueron": 0.15625
+  },
+  {
+   "club_destino": "Bayern Munich",
+   "llegaron": 26,
+   "se_fueron": 0.46153846153846156
+  },
+  {
+   "club_destino": "Borussia Dortmund",
+   "llegaron": 31,
+   "se_fueron": 0.2903225806451613
+  },
+  {
+   "club_destino": "Chelsea FC",
+   "llegaron": 47,
+   "se_fueron": 0.5957446808510638
+  },
+  {
+   "club_destino": "FC Barcelona",
+   "llegaron": 18,
+   "se_fueron": 0.2222222222222222
+  },
+  {
+   "club_destino": "FC Porto",
+   "llegaron": 35,
+   "se_fueron": 0.2571428571428571
+  },
+  {
+   "club_destino": "Inter Milan",
+   "llegaron": 36,
+   "se_fueron": 0.3611111111111111
+  },
+  {
+   "club_destino": "Juventus FC",
+   "llegaron": 38,
+   "se_fueron": 0.3684210526315789
+  },
+  {
+   "club_destino": "Liverpool FC",
+   "llegaron": 17,
+   "se_fueron": 0.058823529411764705
+  },
+  {
+   "club_destino": "Manchester City",
+   "llegaron": 22,
+   "se_fueron": 0.36363636363636365
+  },
+  {
+   "club_destino": "Manchester United",
+   "llegaron": 26,
+   "se_fueron": 0.19230769230769232
+  },
+  {
+   "club_destino": "Paris Saint-Germain",
+   "llegaron": 28,
+   "se_fueron": 0.5357142857142857
+  },
+  {
+   "club_destino": "RB Leipzig",
+   "llegaron": 36,
+   "se_fueron": 0.4166666666666667
+  },
+  {
+   "club_destino": "Real Madrid",
+   "llegaron": 12,
+   "se_fueron": 0.25
+  },
+  {
+   "club_destino": "SL Benfica",
+   "llegaron": 44,
+   "se_fueron": 0.22727272727272727
+  },
+  {
+   "club_destino": "Tottenham Hotspur",
+   "llegaron": 37,
+   "se_fueron": 0.32432432432432434
+  }
+ ],
+ "ultima_temporada": "2026/2027",
+ "chelsea_a_strasbourg": 13,
+ "construido": "2026-11-16",
  "datos": "fichajes_2026-09-20.csv",
  "pasos": [
   [
