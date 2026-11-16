@@ -1247,6 +1247,37 @@ st.caption(f"La barra es la probabilidad; la línea naranja, el umbral ({num(res
            "de 0,25 ya es dos veces y media la tasa general.")
 
 # =============================================================================== CIERRE
+mudryk_c, hernandez_c = fichaje("Mykhaylo Mudryk", "Chelsea FC"), fichaje("Lucas Hernández", "Paris Saint-Germain")
+se_fueron_chelsea = pd.DataFrame(resumen["salidas_top20"]).set_index("club_destino").loc["Chelsea FC", "se_fueron"]
+st.markdown('<div class="etiqueta">Cierre</div>', unsafe_allow_html=True)
+st.header("Sabemos qué factores pesan; lo que el modelo no puede ver es quién compra y qué pasa después")
+st.write(
+    "**La respuesta a la pregunta del proyecto:** llegan a un club top 20, sobre todo, los que rindieron bien para su "
+    "puesto y vienen de un club fuerte de Europa; ser muy joven ayuda, y el puesto no cambia nada. El modelo lo confirma "
+    "y mide cuánto pesa cada factor. Pero con lo que se sabe antes del fichaje tiene un techo: cuando dice «llega», "
+    f"acierta el {pct(t['precision'])} de las veces, y encuentra al {pct(t['recall'])} de los que llegan. Esto es lo que "
+    "quedó sin responder:")
+st.markdown(f"""
+1. **Quién compra.** El destino depende del club que compra, y ése es justamente el dato que el modelo no puede usar:
+   sería la respuesta escrita de otra forma. De ahí salen los dos errores. El {pct(fp_cerca)} de los falsos positivos
+   terminó en un club del puesto 21 al 100, y clubes del top 20 como el Porto o el Benfica compran jugadores que, por sus
+   números, parecen fichajes comunes.
+2. **Lo que pasa en la misma temporada.** El modelo mira la temporada **anterior** al fichaje. Un club que compra en enero
+   lo hace por la primera mitad de la temporada en curso, que el modelo no ve: Mudryk llegó al Chelsea con
+   {miles(mudryk_c.stat_minutes) if mudryk_c is not None else "pocos"} minutos en la temporada anterior. Faltaría separar
+   los fichajes de verano de los de invierno, y sumar esa media temporada.
+3. **Lo que no está en las estadísticas.** Lesiones, conflictos con el club, investigaciones, sueldos, cláusulas, años de
+   contrato. Lucas Hernández llegó al PSG con {miles(hernandez_c.stat_minutes) if hernandez_c is not None else "pocos"}
+   minutos, después de romperse los ligamentos; Osimhen se fue del Napoli por un conflicto con el club; a Paquetá lo
+   frenó una investigación. Ninguna de nuestras tres fuentes tiene esos datos.
+4. **Una línea en el puesto 20.** Preguntamos «top 20, sí o no», pero el ranking de UEFA es una escala continua: para el
+   modelo, un club del puesto 18 y uno del 23 se parecen mucho. Predecir el puesto del club de destino, en vez de sí o
+   no, respondería la pregunta con más matices.
+5. **Si el fichaje salió bien.** El modelo predice a dónde llega un jugador, no si va a rendir: del Chelsea se fue el
+   {pct(se_fueron_chelsea)} de los que llegaron. La pregunta que sigue es otra: qué hace que un jugador, una vez en un
+   top 20, se quede y juegue.
+""")
+
 with st.expander("Qué cambió desde la Entrega 3"):
     st.markdown("""
 La aplicación y la sección 9 del notebook responden directamente la pregunta del proyecto: qué factores pesan y cuánto
