@@ -475,13 +475,15 @@ costos = pd.DataFrame({"grupo": ["llegaron y el modelo los señaló (verdaderos 
 rend_fp = {k: g["score_posicion"].median() for k, g in grupos_fp.items()}
 min_fp = {k: pd.to_numeric(g["stat_minutes"], errors="coerce").median() for k, g in grupos_fp.items()}
 
+llegaron_todos = fichajes[fichajes["es_destino_top_20"].astype(bool)]
 st.markdown("#### Los falsos positivos: el modelo dijo «llega» y no llegaron")
 st.write(
     f"Sobre los {miles(len(fichajes))} fichajes, cada uno con la predicción de un modelo que no lo vio, hay "
     f"**{miles(len(fps))} falsos positivos**: el modelo dijo «llega» y no llegaron. No son jugadores malos que el "
     f"modelo sobrevaloró. Tuvieron temporadas de nivel top —{num(rend_fp['falsos positivos'], 2)} desvíos sobre el "
-    f"promedio de su puesto y {miles(min_fp['falsos positivos'])} minutos de mediana, cerca de los que sí llegaron "
-    f"({num(rend_fp['verdaderos positivos'], 2)} y {miles(min_fp['verdaderos positivos'])})— y los clubes que los "
+    f"promedio de su puesto y {miles(min_fp['falsos positivos'])} minutos de mediana, más que la mitad de todos los que "
+    f"sí llegaron a un top 20 ({num(llegaron_todos['score_posicion'].median(), 2)} y "
+    f"{miles(pd.to_numeric(llegaron_todos['stat_minutes'], errors='coerce').median())})— y los clubes que los "
     "compraron también los vieron así: el gráfico muestra cuánto se pagó, en mediana, por cada grupo. Por un falso "
     "positivo se pagó varias veces más que por un fichaje común. El precio no entra al modelo (se conoce recién en el "
     "fichaje), pero sirve para leer el error después. Como jugaron casi toda la temporada, tampoco son lesionados.")
@@ -499,7 +501,8 @@ st.write(
     "Mirando a dónde fueron y quiénes eran, los falsos positivos se separan en **cuatro tipos**; cada fichaje va al "
     "primero que le corresponde, en este orden. Para cada tipo: qué lo explica, sus números, un ejemplo y una tabla "
     "con otros casos, con lo mismo que mira el modelo para decidir —rendimiento para su puesto, club y liga de "
-    "origen, edad— y, abajo, dos filas para comparar: la mediana de los que llegaron y la de todos los fichajes.")
+    "origen, edad— y, abajo, dos filas para comparar: la mediana de todos los que llegaron a un top 20 y la de todos "
+    "los fichajes.")
 
 OPERACION = {"compra": "compra", "libre": "libre", "cesion": "préstamo", "cesion_con_cargo": "préstamo con cargo"}
 
@@ -514,8 +517,10 @@ def fila_referencia(nombre, grupo):
             "probabilidad": num(grupo["proba"].median(), 2)}
 
 
-def tabla_casos(casos, g):
-    """Los casos de un tipo, con lo que mira el modelo, y dos filas de referencia abajo."""
+def tabla_casos(casos, g, referencia=None):
+    """Los casos de un tipo, con lo que mira el modelo, y dos filas de referencia abajo: un grupo para comparar
+    (por defecto, todos los que llegaron a un top 20) y todos los fichajes."""
+    referencia = referencia or ("→ mediana de todos los que llegaron", llegaron_todos)
     filas = []
     for n_, d_ in casos:
         f_ = fichaje(n_, d_)
@@ -532,7 +537,7 @@ def tabla_casos(casos, g):
                       "probabilidad": num(f_.proba, 2)})
     if not filas:
         return None
-    filas += [fila_referencia("→ mediana de los que llegaron", grupos_fp["verdaderos positivos"]),
+    filas += [fila_referencia(*referencia),
               fila_referencia("→ mediana de todos los fichajes", fichajes)]
     orden = ["jugador", "a (club real)", "probabilidad", "rendimiento vs. su puesto", "minutos", "edad",
              "club de origen", "liga top 5", "coef. UEFA del origen", "operación", "puesto", "temporada"]
@@ -715,7 +720,8 @@ st.markdown("##### ¿Por qué se le escaparon? Cinco tipos")
 st.write(
     "Mirando de dónde venían y quién los compró, los falsos negativos se separan en **cinco tipos**; cada fichaje va al "
     "primero que le corresponde, en este orden. Los fichajes del Chelsea quedan aparte, en su propio bloque al final. "
-    "Como antes: qué lo explica, sus números, un ejemplo y una tabla con otros casos y las dos filas para comparar.")
+    "Como antes: qué lo explica, sus números, un ejemplo y una tabla con otros casos; acá las dos filas para comparar "
+    "son la mediana de los que el modelo sí encontró y la de todos los fichajes.")
 
 
 def bloque_fn(clave, titulo, explicacion, metricas, ejemplo, otros):
@@ -737,7 +743,7 @@ def bloque_fn(clave, titulo, explicacion, metricas, ejemplo, otros):
                                            proba=num(ej.proba, 2), puesto=ej.club_destino_ranking_uefa,
                                            edad=miles(ej.edad_al_fichaje), plural=PLURAL[ej.grupo_posicion],
                                            coef=num(coef, 0) if pd.notna(coef) else "sin ranking"))
-    casos_tabla = tabla_casos(otros, g)
+    casos_tabla = tabla_casos(otros, g, ("→ mediana de los que el modelo encontró", vp_))
     if casos_tabla is not None:
         st.markdown("**Otros casos de este tipo**")
         st.dataframe(casos_tabla, hide_index=True, width="stretch")
